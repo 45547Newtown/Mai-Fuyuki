@@ -26,37 +26,19 @@ def register_handlers(app: Client):
 # Start Message
 # ==========================================================
     async def send_start_menu(message, user):
-        text = f"""
+        text = """Hey there! My name is Mai Fuyuki - I'm here to help you manage your groups! Use /help to find out how to use me to my full potential.
 
-   ✨ Hello {user}! ✨
+Join my news channel to get information on all the latest updates.
 
-👋 I am Nomad 🤖 
-
-Highlights:
-─────────────────────────────
-- Smart Anti-Spam & Link Shield
-- Adaptive Lock System (URLs, Media, Language & more)
-- Modular & Scalable Protection
-- Sleek UI with Inline Controls
-
-» More New Features coming soon ...
-"""
+Check /privacy to view the privacy policy, and interact with your data."""
 
         buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⚒️ Add to Group ⚒️", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")],
-            [
-                InlineKeyboardButton("⌂ Support ⌂", url=SUPPORT_GROUP),
-                InlineKeyboardButton("⌂ Update ⌂", url=UPDATE_CHANNEL),
-            ],
-            [
-                InlineKeyboardButton("※ ŎŴɳēŔ ※", url=f"tg://user?id={OWNER_ID}"),
-                InlineKeyboardButton("Repo", url="https://github.com/LearningBotsOfficial/Nomade"),
-                
-            ],
+            [InlineKeyboardButton("⚒️ Add me to your Group ⚒️", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")],
+            [InlineKeyboardButton("📢 News Channel", url="https://t.me/shinchan_update")],
             [InlineKeyboardButton("📚 Help Commands 📚", callback_data="help")]
         ])
 
-        # Try photo first; if Telegram rejects the image URL, still reply with text.
+        # Try photo first; if Telegram rejects START_IMAGE, still reply with text.
         if message.text:
             try:
                 await message.reply_photo(START_IMAGE, caption=text, reply_markup=buttons)
@@ -78,19 +60,18 @@ Highlights:
     async def start_command(client, message):
         user = message.from_user
         try:
-            # MongoDB should never stop /start from replying.
+            # Reply first so DB/logging can never block /start.
+            await send_start_menu(message, user.first_name if user else "there")
+
             try:
                 if user:
                     await db.add_user(user.id, user.first_name)
             except Exception as exc:
                 logger.warning("Failed to save /start user %s: %s", user.id if user else None, exc)
-            await send_start_menu(message, user.first_name if user else "there")
         except Exception as exc:
             logger.exception("/start failed, sending emergency fallback: %s", exc)
-            await message.reply_text("Hey there! My name is Mai Fuyuki. Use /help to see commands.")
+            await message.reply_text("Hey there! My name is Mai Fuyuki - I'm here to help you manage your groups! Use /help to find out how to use me to my full potential.")
 
-# ==========================================================
-# Help Menu Message
 # ==========================================================
     async def send_help_menu(message):
         text = """
