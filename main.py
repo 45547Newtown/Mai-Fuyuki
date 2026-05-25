@@ -31,14 +31,16 @@ app = Client(
 )
 
 
-
-
 @app.on_message(filters.command("logtest"))
 async def log_test(client: Client, message: Message):
     if not LOG_CHAT_ID:
         return await message.reply_text("❌ LOG_CHAT_ID is not set in environment variables.")
     sent = await send_log(client, "<b>✅ NomadeHelpBot log channel test successful.</b>")
-    await message.reply_text("✅ Log channel working." if sent else "❌ Could not send to LOG_CHAT_ID. Add bot to log channel/group as admin and check the ID.")
+    await message.reply_text(
+        "✅ Log channel working."
+        if sent
+        else "❌ Could not send to LOG_CHAT_ID. Add bot to log channel/group as admin and check the ID."
+    )
 
 
 @app.on_message(filters.command("ping"))
@@ -62,6 +64,5 @@ async def boot():
 
 
 if __name__ == "__main__":
-    # Render Web Services need an open port. This does not affect Koyeb/worker deploys.
     start_health_server()
     app.run(boot())
