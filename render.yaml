@@ -1,7 +1,10 @@
 services:
-  - type: worker
-    name: nomade-help-bot
-    env: python
-    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
-    startCommand: python main.py
-    autoDeploy: false
+  - type: web
+    name: NomadeHelpBot
+    runtime: docker
+    plan: free
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: PORT
+        value: "8080"

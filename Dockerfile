@@ -13,8 +13,8 @@ WORKDIR /app
 COPY . /app
 
 # Install dependencies
-RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip --root-user-action=ignore \
+    && pip install --no-cache-dir --root-user-action=ignore -r requirements.txt
     
 # Environment variable to force unbuffered output (helps in logging)
 ENV PYTHONUNBUFFERED=1

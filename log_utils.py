@@ -33,7 +33,7 @@ async def send_log(client: Client, text: str, *, disable_web_page_preview: bool 
         )
         return True
     except Exception as exc:
-        logger.warning("Failed to send log message to LOG_CHAT_ID=%s: %s", LOG_CHAT_ID, exc)
+        logger.warning("Failed to send log message to LOG_CHAT_ID=%s: %s. Add the bot to that channel/group as admin, or use @public_channel username for public channels.", LOG_CHAT_ID, exc)
         return False
 
 
@@ -75,7 +75,7 @@ async def send_startup_log(client: Client) -> None:
         except Exception:
             await client.send_message(LOG_CHAT_ID, caption, parse_mode=ParseMode.HTML)
     except Exception as exc:
-        logger.warning("Startup log failed: %s", exc)
+        logger.warning("Startup log failed: %s. LOG_CHAT_ID must be a chat the bot can access. Add bot as admin/member and use the correct -100... id or @public_channel username.", exc)
 
 
 async def log_command(client: Client, message) -> None:
