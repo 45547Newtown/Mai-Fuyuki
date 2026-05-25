@@ -16,6 +16,9 @@ from pyrogram.types import (
 )
 from config import BOT_USERNAME, SUPPORT_GROUP, UPDATE_CHANNEL, START_IMAGE, OWNER_ID
 import db
+import logging
+
+logger = logging.getLogger(__name__)
 
 def register_handlers(app: Client):
 
@@ -53,13 +56,20 @@ Highlights:
             [InlineKeyboardButton("📚 Help Commands 📚", callback_data="help")]
         ])
 
-        # If /start command, send a new photo
+        # Try photo first; if Telegram rejects the image URL, still reply with text.
         if message.text:
-            await message.reply_photo(START_IMAGE, caption=text, reply_markup=buttons)
+            try:
+                await message.reply_photo(START_IMAGE, caption=text, reply_markup=buttons)
+            except Exception as exc:
+                logger.warning("/start photo failed, sending text fallback: %s", exc)
+                await message.reply_text(text, reply_markup=buttons, disable_web_page_preview=True)
         else:
-            # If callback, edit the same message
-            media = InputMediaPhoto(media=START_IMAGE, caption=text)
-            await message.edit_media(media=media, reply_markup=buttons)
+            try:
+                media = InputMediaPhoto(media=START_IMAGE, caption=text)
+                await message.edit_media(media=media, reply_markup=buttons)
+            except Exception as exc:
+                logger.warning("start menu edit failed, sending text fallback: %s", exc)
+                await message.reply_text(text, reply_markup=buttons, disable_web_page_preview=True)
 
 # ==========================================================
 # Start Command
@@ -67,8 +77,12 @@ Highlights:
     @app.on_message(filters.private & filters.command("start"))
     async def start_command(client, message):
         user = message.from_user
-        await db.add_user(user.id, user.first_name)
-        await send_start_menu(message, user.first_name)
+        # MongoDB should never stop /start from replying.
+        try:
+            await db.add_user(user.id, user.first_name)
+        except Exception as exc:
+            logger.warning("Failed to save /start user %s: %s", user.id if user else None, exc)
+        await send_start_menu(message, user.first_name if user else "there")
 
 # ==========================================================
 # Help Menu Message
