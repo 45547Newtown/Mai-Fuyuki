@@ -2,45 +2,81 @@ import html
 import logging
 import platform
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Union
 
+import aiohttp
 from pyrogram import Client
-from pyrogram.enums import ParseMode
 
-from config import LOG_CHAT_ID, START_IMAGE, SUPPORT_GROUP, UPDATE_CHANNEL, BOT_USERNAME
+from config import LOG_CHAT_ID, START_IMAGE, BOT_USERNAME, BOT_TOKEN
 
 logger = logging.getLogger(__name__)
+
+# Important: Pyrogram/MTProto often throws "Peer id invalid" for private
+# channels when only a numeric -100... id is known. Telegram Bot API can send
+# to the same -100... id as long as the bot is admin/member, so all log-channel
+# messages are sent via Bot API instead of client.send_message().
+_LOG_DISABLED = False
 
 
 def _escape(value) -> str:
     return html.escape(str(value or ""))
 
 
-async def send_log(client: Client, text: str, *, disable_web_page_preview: bool = True) -> bool:
-    """Send a message to LOG_CHAT_ID if configured.
+def _chat_id() -> Optional[Union[int, str]]:
+    return LOG_CHAT_ID or None
 
-    The bot must already be added to the log group/channel. For private channels,
-    add the bot as admin and set LOG_CHAT_ID to the -100... id.
-    """
-    if not LOG_CHAT_ID:
-        return False
+
+async def _bot_api(method: str, payload: dict) -> tuple[bool, str]:
+    global _LOG_DISABLED
+    if _LOG_DISABLED:
+        return False, "log disabled after previous failure"
+    if not BOT_TOKEN:
+        return False, "BOT_TOKEN missing"
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/{method}"
     try:
-        await client.send_message(
-            LOG_CHAT_ID,
-            text,
-            parse_mode=ParseMode.HTML,
-            disable_web_page_preview=disable_web_page_preview,
-        )
-        return True
+        timeout = aiohttp.ClientTimeout(total=20)
+        async with aiohttp.ClientSession(timeout=timeout) as session:
+            async with session.post(url, data=payload) as resp:
+                data = await resp.json(content_type=None)
+                if data.get("ok"):
+                    return True, "ok"
+                desc = data.get("description", str(data))
+                # Disable only for permanent chat-id/access errors so Render logs stay clean.
+                lowered = desc.lower()
+                if any(x in lowered for x in ["chat not found", "bot was kicked", "not enough rights", "forbidden"]):
+                    _LOG_DISABLED = True
+                return False, desc
     except Exception as exc:
-        logger.warning("Failed to send log message to LOG_CHAT_ID=%s: %s. Add the bot to that channel/group as admin, or use @public_channel username for public channels.", LOG_CHAT_ID, exc)
+        return False, str(exc)
+
+
+async def send_log(client: Client, text: str, *, disable_web_page_preview: bool = True) -> bool:
+    """Send a text log to LOG_CHAT_ID using Telegram Bot API.
+
+    Works for private channels/groups with numeric -100... IDs when the bot is
+    added as admin/member. This avoids Pyrogram's MTProto peer-cache issue.
+    """
+    chat_id = _chat_id()
+    if not chat_id:
         return False
+    ok, info = await _bot_api(
+        "sendMessage",
+        {
+            "chat_id": str(chat_id),
+            "text": text,
+            "parse_mode": "HTML",
+            "disable_web_page_preview": "true" if disable_web_page_preview else "false",
+        },
+    )
+    if not ok:
+        logger.info("Log send skipped: %s", info)
+    return ok
 
 
 async def send_startup_log(client: Client) -> None:
     """CipherElite-style startup report for NomadeHelpBot."""
-    if not LOG_CHAT_ID:
-        logger.warning("LOG_CHAT_ID is not set; startup log skipped.")
+    chat_id = _chat_id()
+    if not chat_id:
         return
 
     try:
@@ -65,24 +101,27 @@ async def send_startup_log(client: Client) -> None:
             "<b>Nomade Power Activated!</b>"
         )
 
-        try:
-            await client.send_photo(
-                LOG_CHAT_ID,
-                photo=START_IMAGE,
-                caption=caption,
-                parse_mode=ParseMode.HTML,
-            )
-        except Exception:
-            await client.send_message(LOG_CHAT_ID, caption, parse_mode=ParseMode.HTML)
+        # Try photo first; if the image URL/file is invalid, send text instead.
+        ok, info = await _bot_api(
+            "sendPhoto",
+            {
+                "chat_id": str(chat_id),
+                "photo": START_IMAGE,
+                "caption": caption,
+                "parse_mode": "HTML",
+            },
+        )
+        if not ok:
+            ok2 = await send_log(client, caption)
+            if not ok2:
+                logger.info("Startup log skipped: %s", info)
     except Exception as exc:
-        logger.warning("Startup log failed: %s. LOG_CHAT_ID must be a chat the bot can access. Add bot as admin/member and use the correct -100... id or @public_channel username.", exc)
+        logger.info("Startup log skipped: %s", exc)
 
 
 async def log_command(client: Client, message) -> None:
     """Log commands and private messages without breaking normal handlers."""
     if not LOG_CHAT_ID or not message or not message.from_user:
-        return
-    if message.chat and message.chat.id == LOG_CHAT_ID:
         return
 
     user = message.from_user
@@ -98,7 +137,7 @@ async def log_command(client: Client, message) -> None:
         "<b>📥 NomadeHelpBot Log</b>\n\n"
         f"<b>User:</b> {_escape(user.first_name)} (<code>{user.id}</code>)\n"
         f"<b>Username:</b> @{_escape(user.username) if user.username else 'None'}\n"
-        f"<b>Chat:</b> {_escape(chat.title if chat else 'Private')} (<code>{chat.id if chat else 'N/A'}</code>)\n"
+        f"<b>Chat:</b> {_escape(chat.title if chat and chat.title else 'Private')} (<code>{chat.id if chat else 'N/A'}</code>)\n"
         f"<b>Message:</b>\n<code>{_escape(text[:3500])}</code>"
     )
     await send_log(client, log_text)

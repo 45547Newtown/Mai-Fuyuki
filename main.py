@@ -39,7 +39,12 @@ async def log_test(client: Client, message: Message):
     await message.reply_text("✅ Log channel working." if sent else "❌ Could not send to LOG_CHAT_ID. Add bot to log channel/group as admin and check the ID.")
 
 
-@app.on_message(group=-100)
+@app.on_message(filters.command("ping"))
+async def ping_command(client: Client, message: Message):
+    await message.reply_text("✅ Bot is alive.")
+
+
+@app.on_message(group=99)
 async def command_logger(client: Client, message: Message):
     await log_command(client, message)
 
