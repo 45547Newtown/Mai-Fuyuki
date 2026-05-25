@@ -74,15 +74,20 @@ Highlights:
 # ==========================================================
 # Start Command
 # ==========================================================
-    @app.on_message(filters.private & filters.command("start"))
+    @app.on_message(filters.private & filters.command("start"), group=-10)
     async def start_command(client, message):
         user = message.from_user
-        # MongoDB should never stop /start from replying.
         try:
-            await db.add_user(user.id, user.first_name)
+            # MongoDB should never stop /start from replying.
+            try:
+                if user:
+                    await db.add_user(user.id, user.first_name)
+            except Exception as exc:
+                logger.warning("Failed to save /start user %s: %s", user.id if user else None, exc)
+            await send_start_menu(message, user.first_name if user else "there")
         except Exception as exc:
-            logger.warning("Failed to save /start user %s: %s", user.id if user else None, exc)
-        await send_start_menu(message, user.first_name if user else "there")
+            logger.exception("/start failed, sending emergency fallback: %s", exc)
+            await message.reply_text("Hey there! My name is Mai Fuyuki. Use /help to see commands.")
 
 # ==========================================================
 # Help Menu Message
