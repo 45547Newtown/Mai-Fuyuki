@@ -1,78 +1,58 @@
 # ============================================================
-#Group Manager Bot
-# Author: LearningBotsOfficial (https://github.com/LearningBotsOfficial) 
-# Support: https://t.me/LearningBotsCommunity
-# Channel: https://t.me/learning_bots
-# YouTube: https://youtube.com/@learning_bots
-# License: Open-source (keep credits, no resale)
+# Group Manager Bot - Start/Help handlers
 # ============================================================
 
-
 from pyrogram import Client, filters
-from pyrogram.types import (
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-    InputMediaPhoto
-)
-from config import BOT_USERNAME, SUPPORT_GROUP, UPDATE_CHANNEL, START_IMAGE, OWNER_ID
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from config import BOT_USERNAME, START_IMAGE
 import db
 import logging
 
 logger = logging.getLogger(__name__)
 
-def register_handlers(app: Client):
-
-# ==========================================================
-# Start Message
-# ==========================================================
-    async def send_start_menu(message, user):
-        text = """Hey there! My name is Mai Fuyuki - I'm here to help you manage your groups! Use /help to find out how to use me to my full potential.
+START_TEXT = """Hey there! My name is Mai Fuyuki - I'm here to help you manage your groups! Use /help to find out how to use me to my full potential.
 
 Join my news channel to get information on all the latest updates.
 
 Check /privacy to view the privacy policy, and interact with your data."""
 
-        buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("⚒️ Add me to your Group ⚒️", url=f"https://t.me/{BOT_USERNAME}?startgroup=true")],
-            [InlineKeyboardButton("📢 News Channel", url="https://t.me/shinchan_update")],
-            [InlineKeyboardButton("📚 Help Commands 📚", callback_data="help")]
-        ])
 
-        # Try photo first; if Telegram rejects START_IMAGE, still reply with text.
-        if message.text:
-            try:
-                await message.reply_photo(START_IMAGE, caption=text, reply_markup=buttons)
-            except Exception as exc:
-                logger.warning("/start photo failed, sending text fallback: %s", exc)
-                await message.reply_text(text, reply_markup=buttons, disable_web_page_preview=True)
-        else:
-            try:
-                media = InputMediaPhoto(media=START_IMAGE, caption=text)
-                await message.edit_media(media=media, reply_markup=buttons)
-            except Exception as exc:
-                logger.warning("start menu edit failed, sending text fallback: %s", exc)
-                await message.reply_text(text, reply_markup=buttons, disable_web_page_preview=True)
+def start_keyboard():
+    return InlineKeyboardMarkup(
+        [
+            [
+                InlineKeyboardButton(
+                    "⚒️ Add me to your Group ⚒️",
+                    url=f"https://t.me/{BOT_USERNAME}?startgroup=true",
+                )
+            ]
+        ]
+    )
 
-# ==========================================================
-# Start Command
-# ==========================================================
+
+def register_handlers(app: Client):
+
+    async def send_start_menu(message, user=None):
+        # TEXT ONLY: no image, no news/help buttons. Only Add me to Group button.
+        await message.reply_text(
+            START_TEXT,
+            reply_markup=start_keyboard(),
+            disable_web_page_preview=True,
+        )
+
     @app.on_message(filters.private & filters.command("start"), group=-10)
     async def start_command(client, message):
         user = message.from_user
+
+        # Reply first so DB/logging can never block /start.
+        await send_start_menu(message, user.first_name if user else "there")
+
         try:
-            # Reply first so DB/logging can never block /start.
-            await send_start_menu(message, user.first_name if user else "there")
-
-            try:
-                if user:
-                    await db.add_user(user.id, user.first_name)
-            except Exception as exc:
-                logger.warning("Failed to save /start user %s: %s", user.id if user else None, exc)
+            if user:
+                await db.add_user(user.id, user.first_name)
         except Exception as exc:
-            logger.exception("/start failed, sending emergency fallback: %s", exc)
-            await message.reply_text("Hey there! My name is Mai Fuyuki - I'm here to help you manage your groups! Use /help to find out how to use me to my full potential.")
+            logger.warning("Failed to save /start user %s: %s", user.id if user else None, exc)
 
-# ==========================================================
     async def send_help_menu(message):
         text = """
 ╔══════════════════╗
@@ -87,35 +67,31 @@ Choose a category below to explore commands:
                 InlineKeyboardButton("⌂ Greetings ⌂", callback_data="greetings"),
                 InlineKeyboardButton("⌂ Locks ⌂", callback_data="locks"),
             ],
-            [
-                InlineKeyboardButton("⌂ Moderation ⌂", callback_data="moderation")
-            ],
-            [InlineKeyboardButton("🔙 Back", callback_data="back_to_start")]
+            [InlineKeyboardButton("⌂ Moderation ⌂", callback_data="moderation")],
+            [InlineKeyboardButton("🔙 Back", callback_data="back_to_start")],
         ])
 
-        media = InputMediaPhoto(media=START_IMAGE, caption=text)
-        await message.edit_media(media=media, reply_markup=buttons)
+        try:
+            media = InputMediaPhoto(media=START_IMAGE, caption=text)
+            await message.edit_media(media=media, reply_markup=buttons)
+        except Exception:
+            await message.reply_text(text, reply_markup=buttons)
 
-# ==========================================================
-# Help Callback_query
-# ==========================================================
     @app.on_callback_query(filters.regex("help"))
     async def help_callback(client, callback_query):
         await send_help_menu(callback_query.message)
         await callback_query.answer()
 
-# ==========================================================
-# back to start Callback_query
-# ==========================================================
     @app.on_callback_query(filters.regex("back_to_start"))
     async def back_to_start_callback(client, callback_query):
-        user = callback_query.from_user.first_name
-        await send_start_menu(callback_query.message, user)
+        # Back button should show same simple text-only start menu.
+        await callback_query.message.reply_text(
+            START_TEXT,
+            reply_markup=start_keyboard(),
+            disable_web_page_preview=True,
+        )
         await callback_query.answer()
 
-# ==========================================================
-# Greetings Callback_query
-# ==========================================================
     @app.on_callback_query(filters.regex("greetings"))
     async def greetings_callback(client, callback_query):
         text = """
@@ -138,16 +114,11 @@ Supported Placeholders:
 Example:
  /setwelcome Hello {first_name}! Welcome to {title}!
 """
-        buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 Back", callback_data="help")]
-        ])
+        buttons = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="help")]])
         media = InputMediaPhoto(media=START_IMAGE, caption=text)
         await callback_query.message.edit_media(media=media, reply_markup=buttons)
         await callback_query.answer()
 
-# ==========================================================
-# Locks callback_query
-# ==========================================================
     @app.on_callback_query(filters.regex("locks"))
     async def locks_callback(client, callback_query):
         text = """
@@ -172,94 +143,36 @@ Example:
  /lock url       : Blocks any messages containing links
  /unlock sticker : Allows stickers again
 """
-        buttons = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 Back", callback_data="help")]
-        ])
+        buttons = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="help")]])
         media = InputMediaPhoto(media=START_IMAGE, caption=text)
         await callback_query.message.edit_media(media=media, reply_markup=buttons)
         await callback_query.answer()
 
-# ==========================================================
-# Moderation Callback_query
-# ==========================================================
     @app.on_callback_query(filters.regex("moderation"))
     async def info_callback(client, callback_query):
-        try:
-            text = """
+        text = """
 ╔══════════════════╗
       ⚙️ Moderation System
 ╚══════════════════╝
 
 Manage your group easily with these tools:
 
-¤ /kick <user> — Remove a user  
-¤ /ban <user> — Ban permanently  
-¤ /unban <user> — Lift ban  
-¤ /mute <user> — Disable messages  
-¤ /unmute <user> — Allow messages again  
-¤ /warn <user> — Add warning (3 = mute)  
-¤ /warns <user> — View warnings  
-¤ /resetwarns <user> — Clear all warnings  
+¤ /kick <user> — Remove a user
+¤ /ban <user> — Ban permanently
+¤ /unban <user> — Lift ban
+¤ /mute <user> — Disable messages
+¤ /unmute <user> — Allow messages again
+¤ /warn <user> — Add warning (3 = mute)
+¤ /warns <user> — View warnings
+¤ /resetwarns <user> — Clear all warnings
 ¤ /promote <user> — make admin
-¤ /demote <user> — remove from admin  
+¤ /demote <user> — remove from admin
 
 💡 Example:
-Reply to a user or type  
+Reply to a user or type
 <code>/ban @username</code>
-
 """
-            buttons = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Back", callback_data="help")]
-            ])
-    
-            media = InputMediaPhoto(media=START_IMAGE, caption=text)
-            await callback_query.message.edit_media(media=media, reply_markup=buttons)
-            await callback_query.answer()
-    
-        except Exception as e:
-            print(f"Error in info_callback: {e}")
-            await callback_query.answer("❌ Something went wrong.", show_alert=True)
-    
-
-# ==========================================================
-# Broadcast Command
-# ==========================================================
-    @app.on_message(filters.private & filters.command("broadcast"))
-    async def broadcast_message(client, message):
-        if not message.reply_to_message:
-            await message.reply_text("⚠️ Please reply to a message to broadcast it.")
-            return
-
-        if message.from_user.id != OWNER_ID:
-            await message.reply_text("❌ Only the bot owner can use this command.")
-            return
-
-        text_to_send = message.reply_to_message.text or message.reply_to_message.caption
-        if not text_to_send:
-            await message.reply_text("⚠️ The replied message has no text to send.")
-            return
-
-        users = await db.get_all_users()
-        sent, failed = 0, 0
-
-        await message.reply_text(f"Broadcasting to {len(users)} users..")
-
-        for user_id in users:
-            try:
-                await client.send_message(user_id, text_to_send)
-                sent += 1
-            except Exception:
-                failed += 1
-
-        await message.reply_text(f"✅ Broadcast finished!\n\n Sent: {sent}\nFailed: {failed}")
-
-# ==========================================================
-# stats Command
-# ==========================================================
-    @app.on_message(filters.private & filters.command("stats"))
-    async def stats_command(client, message):
-        if message.from_user.id != OWNER_ID:
-            return await message.reply_text("❌ Only the bot owner can use this command")
-
-        users = await db.get_all_users()
-        return await message.reply_text(f"💡 Total users: {len(users)}")
+        buttons = InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Back", callback_data="help")]])
+        media = InputMediaPhoto(media=START_IMAGE, caption=text)
+        await callback_query.message.edit_media(media=media, reply_markup=buttons)
+        await callback_query.answer()
