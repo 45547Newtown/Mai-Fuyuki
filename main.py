@@ -33,18 +33,6 @@ app = Client(
 
 
 
-@app.on_message(filters.private & filters.command("start"), group=-100)
-async def emergency_start(client: Client, message: Message):
-    """Ultra-priority /start reply so logging can never be the only response."""
-    try:
-        await message.reply_text(
-            "Hey there! My name is Mai Fuyuki - I'm here to help you manage your groups!\n\n"
-            "Use /help to find out how to use me to my full potential."
-        )
-        logger.info("/start replied by emergency_start for user %s", message.from_user.id if message.from_user else None)
-    except Exception as exc:
-        logger.exception("Emergency /start reply failed: %s", exc)
-
 @app.on_message(filters.command("logtest"))
 async def log_test(client: Client, message: Message):
     if not LOG_CHAT_ID:
