@@ -1,1 +1,0 @@
-from plugin.force_subscribe.buttons import register_force_subscribe
