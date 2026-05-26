@@ -36,7 +36,7 @@ Check /privacy to view the privacy policy, and interact with your data."""
         buttons = InlineKeyboardMarkup([
             [
                 InlineKeyboardButton(
-                    "⚒ Add me to your Group ⚒",
+                    "ᴀᴅᴅ ᴍᴇ ɪɴ ʏᴏᴜʀ ɢʀᴏᴜᴘ",
                     url=f"https://t.me/{bot_username}?startgroup=true"
                 )
             ]
