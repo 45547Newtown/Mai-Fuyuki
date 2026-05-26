@@ -147,6 +147,81 @@ def register_group_commands(app: Client):
         await message.reply_text("✅ Custom welcome saved!")
 
 
+    # ==========================================================
+    # setwelcomebutton
+    # Usage: /setwelcomebutton YouTube Channel | https://youtube.com
+    #        Multiple buttons: har ek naye line pe
+    # ==========================================================
+
+    @app.on_message(filters.group & filters.command("setwelcomebutton"))
+    async def set_welcome_button(client, message: Message):
+        if not await is_power(client, message.chat.id, message.from_user.id):
+            return await message.reply_text("❌ Only admin can use this command.")
+
+        parts = message.text.split(maxsplit=1)
+        if len(parts) < 2:
+            return await message.reply_text(
+                "📌 Usage:\n"
+                "`/setwelcomebutton Button Name | https://link.com`\n\n"
+                "Multiple buttons:\n"
+                "`/setwelcomebutton YouTube Channel | https://youtube.com\n"
+                "Tutorial Channel | https://t.me/channel`"
+            )
+
+        buttons = []
+        errors = []
+        for line in parts[1].strip().split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            if "|" not in line:
+                errors.append(f"❌ `{line}` — `|` missing")
+                continue
+            split = line.split("|", 1)
+            text = split[0].strip()
+            url = split[1].strip()
+            if not url.startswith("http"):
+                errors.append(f"❌ Invalid URL: `{url}`")
+                continue
+            buttons.append({"text": text, "url": url})
+
+        if not buttons:
+            return await message.reply_text("⚠️ Koi valid button nahi mila.\nFormat: `Name | https://link.com`")
+
+        await db.set_welcome_buttons(message.chat.id, buttons)
+        btn_list = "\n".join([f"• {b['text']} → {b['url']}" for b in buttons])
+        reply = f"✅ {len(buttons)} button(s) save ho gaye!\n\n{btn_list}"
+        if errors:
+            reply += "\n\n" + "\n".join(errors)
+        await message.reply_text(reply)
+
+
+    # ==========================================================
+    # clearwelcomebutton
+    # ==========================================================
+
+    @app.on_message(filters.group & filters.command("clearwelcomebutton"))
+    async def clear_welcome_button(client, message: Message):
+        if not await is_power(client, message.chat.id, message.from_user.id):
+            return await message.reply_text("❌ Only admin can use this command.")
+        await db.clear_welcome_buttons(message.chat.id)
+        await message.reply_text("🗑️ Welcome buttons hata diye gaye!")
+
+
+    # ==========================================================
+    # welcomebuttons — current buttons dekho
+    # ==========================================================
+
+    @app.on_message(filters.group & filters.command("welcomebuttons"))
+    async def show_welcome_buttons(client, message: Message):
+        if not await is_power(client, message.chat.id, message.from_user.id):
+            return await message.reply_text("❌ Only admin can use this command.")
+        saved = await db.get_welcome_buttons(message.chat.id)
+        if not saved:
+            return await message.reply_text("ℹ️ Koi welcome button set nahi hai.")
+        btn_list = "\n".join([f"{i+1}. {b['text']} → {b['url']}" for i, b in enumerate(saved)])
+        await message.reply_text(f"📋 Current buttons ({len(saved)}):\n\n{btn_list}")
+
 
     
     # ==========================================================
