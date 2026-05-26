@@ -52,11 +52,16 @@ async def cmd_service_delete_on(client: Client, message: Message) -> None:
     logger.info("ServiceDelete ENABLED  chat=%s by user=%s", message.chat.id, message.from_user.id)
 
     await message.reply_text(
-        "✅ **Service Message Auto-Delete: ON**\n\n"
-        "🗑️ Join and leave service messages will now be deleted automatically.\n\n"
-        "• `new_chat_members` — user joined or was added\n"
-        "• `left_chat_member` — user left or was removed\n\n"
-        "_Make sure the bot has **Delete Messages** admin permission._"
+        "✅ ꜱᴇʀᴠɪᴄᴇ ᴍᴇꜱꜱᴀɢᴇ\n"
+        "ᴀᴜᴛᴏ-ᴅᴇʟᴇᴛᴇ : ᴏɴ\n\n"
+        "ᴊᴏɪɴ ᴀɴᴅ ʟᴇᴀᴠᴇ\n"
+        "ꜱᴇʀᴠɪᴄᴇ ᴍᴇꜱꜱᴀɢᴇꜱ\n"
+        "ᴡɪʟʟ ɴᴏᴡ ʙᴇ\n"
+        "ᴅᴇʟᴇᴛᴇᴅ ᴀᴜᴛᴏᴍᴀᴛɪᴄᴀʟʟʏ.\n\n"
+        "• ɴᴇᴡ_ᴄʜᴀᴛ_ᴍᴇᴍʙᴇʀꜱ\n"
+        "• ʟᴇꜰᴛ_ᴄʜᴀᴛ_ᴍᴇᴍʙᴇʀ\n\n"
+        "ᴍᴀᴋᴇ ꜱᴜʀᴇ ʙᴏᴛ ʜᴀꜱ\n"
+        "ᴅᴇʟᴇᴛᴇ ᴍᴇꜱꜱᴀɢᴇꜱ ᴘᴇʀᴍɪꜱꜱɪᴏɴ."
     )
 
 
@@ -80,9 +85,14 @@ async def cmd_service_delete_off(client: Client, message: Message) -> None:
     logger.info("ServiceDelete DISABLED chat=%s by user=%s", message.chat.id, message.from_user.id)
 
     await message.reply_text(
-        "🔴 **Service Message Auto-Delete: OFF**\n\n"
-        "Join and leave messages will no longer be auto-deleted.\n\n"
-        "_Use /service\\_delete\\_on to re-enable._"
+        "🔴 ꜱᴇʀᴠɪᴄᴇ ᴍᴇꜱꜱᴀɢᴇ\n"
+        "ᴀᴜᴛᴏ-ᴅᴇʟᴇᴛᴇ : ᴏꜰꜰ\n\n"
+        "ᴊᴏɪɴ ᴀɴᴅ ʟᴇᴀᴠᴇ\n"
+        "ᴍᴇꜱꜱᴀɢᴇꜱ ᴡɪʟʟ\n"
+        "ɴᴏ ʟᴏɴɢᴇʀ ʙᴇ\n"
+        "ᴀᴜᴛᴏ-ᴅᴇʟᴇᴛᴇᴅ.\n\n"
+        "ᴜꜱᴇ /service_delete_on\n"
+        "ᴛᴏ ʀᴇ-ᴇɴᴀʙʟᴇ."
     )
 
 
@@ -93,3 +103,4 @@ def register_service_delete_commands(app: Client) -> None:
     app.on_message(filters.command("service_delete_on"))(cmd_service_delete_on)
     app.on_message(filters.command("service_delete_off"))(cmd_service_delete_off)
     logger.info("✅ ServiceDelete commands registered (/service_delete_on | off).")
+    
