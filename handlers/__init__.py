@@ -10,10 +10,12 @@
 from .start import register_handlers
 from .group_commands import register_group_commands
 from .repo import register_repo_handler
+from plugin.lock_system import register_lock_system
 
 def register_all_handlers(app):
     register_handlers(app)
     register_repo_handler(app)
     register_group_commands(app)
-    print("✅ Group commands registered!")
+    register_lock_system(app)
+    print("✅ Group commands and plugins registered!")
 
