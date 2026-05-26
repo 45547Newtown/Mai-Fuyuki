@@ -131,11 +131,18 @@ async def log_command(client: Client, message) -> None:
         return
 
     log_text = (
-        "<b>📥 NomadeHelpBot Log</b>\n\n"
-        f"<b>User:</b> {_escape(user.first_name)} (<code>{user.id}</code>)\n"
-        f"<b>Username:</b> @{_escape(user.username) if user.username else 'None'}\n"
-        f"<b>Chat:</b> {_escape(chat.title if chat and chat.title else 'Private')} (<code>{chat.id if chat else 'N/A'}</code>)\n"
-        f"<b>Message:</b>\n<code>{_escape(text[:3500])}</code>"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        "ʜɪᴍᴀᴡᴀʀɪ ʙᴏᴛ ʟᴏɢ\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        f"ᴜꜱᴇʀ       : {_escape(user.first_name)}\n"
+        f"ᴜꜱᴇʀ ɪᴅ    : {user.id}\n\n"
+        f"ᴜꜱᴇʀɴᴀᴍᴇ   : @{_escape(user.username) if user.username else 'ɴᴏɴᴇ'}\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        f"ᴄʜᴀᴛ       : {_escape(chat.title if chat and chat.title else 'ᴘʀɪᴠᴀᴛᴇ')}\n"
+        f"ᴄʜᴀᴛ ɪᴅ    : {chat.id if chat else 'ɴ/ᴀ'}\n\n"
+        "━━━━━━━━━━━━━━━━━━\n\n"
+        f"ᴄᴏᴍᴍᴀɴᴅ    : {_escape(text[:3500])}\n\n"
+        "━━━━━━━━━━━━━━━━━━"
     )
     await send_log(client, log_text)
-    
+
