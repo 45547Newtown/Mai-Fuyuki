@@ -117,6 +117,42 @@ async def clear_group_data(chat_id: int):
     await db.welcome.delete_one({"chat_id": chat_id})
     await db.locks.delete_one({"chat_id": chat_id})
     await db.warns.delete_many({"chat_id": chat_id})
+    await db.group_approvals.delete_one({"chat_id": chat_id})
+
+
+# ==========================================================
+# ✅ Group Approval System
+# ==========================================================
+
+async def set_group_approval(chat_id: int, status: str, approved_by: int = None):
+    """
+    status: 'pending' | 'approved' | 'rejected'
+    """
+    update = {"status": status}
+    if approved_by:
+        update["approved_by"] = approved_by
+    await db.group_approvals.update_one(
+        {"chat_id": chat_id},
+        {"$set": update},
+        upsert=True
+    )
+
+async def get_group_approval(chat_id: int) -> str:
+    """Returns 'approved', 'rejected', 'pending', or None (not in DB)."""
+    data = await db.group_approvals.find_one({"chat_id": chat_id})
+    if data:
+        return data.get("status", "pending")
+    return None
+
+async def is_group_approved(chat_id: int) -> bool:
+    status = await get_group_approval(chat_id)
+    return status == "approved"
+
+async def get_all_pending_groups() -> list:
+    groups = []
+    async for doc in db.group_approvals.find({"status": "pending"}):
+        groups.append(doc)
+    return groups
 
 
 # ==========================================================
