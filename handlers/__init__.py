@@ -1,21 +1,11 @@
-# ============================================================
-# Group Manager Bot
-# Author: LearningBotsOfficial (https://github.com/LearningBotsOfficial) 
-# Support: https://t.me/LearningBotsCommunity
-# Channel: https://t.me/learning_bots
-# YouTube: https://youtube.com/@learning_bots
-# License: Open-source (keep credits, no resale)
-# ============================================================
+from handlers.start import register_handlers
+from plugin.lock_system import register_all_lock_plugins
 
-from .start import register_handlers
-from .group_commands import register_group_commands
-from .repo import register_repo_handler
-from plugin.lock_system import register_lock_system
 
 def register_all_handlers(app):
-    register_handlers(app)
-    register_repo_handler(app)
-    register_group_commands(app)
-    register_lock_system(app)
-    print("✅ Group commands and plugins registered!")
 
+    # Start commands
+    register_handlers(app)
+
+    # Lock system
+    register_all_lock_plugins(app)
