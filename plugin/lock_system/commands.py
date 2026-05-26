@@ -1,139 +1,82 @@
-# ============================================================
-# Mai Fuyuki - Lock System Plugin
-# Commands: /lock, /unlock, /locks
-# ============================================================
-
-import re
-import logging
-
-from pyrogram import Client, filters
-from pyrogram.enums import ChatMemberStatus, MessageEntityType
-
-import db
-
-logger = logging.getLogger(__name__)
+from pyrogram import filters
+from pyrogram.types import ChatPermissions
 
 VALID_LOCKS = ["url", "sticker", "media", "username", "forward"]
 
 
-async def is_admin(client: Client, chat_id: int, user_id: int) -> bool:
+async def is_admin(client, chat_id, user_id):
     member = await client.get_chat_member(chat_id, user_id)
-    return member.status in (ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER)
+    return member.status in ("administrator", "owner")
 
 
-def _usage_text() -> str:
-    return (
-        "⚙️ Usage:\n"
-        "• /lock all\n"
-        "• /unlock all\n"
-        "• /lock url | sticker | media | username | forward\n"
-        "• /unlock url | sticker | media | username | forward"
-    )
+def register_handlers(app):
 
+    @app.on_message(filters.command("lock") & filters.group)
+    async def lock_cmd(client, message):
+        if not await is_admin(client, message.chat.id, message.from_user.id):
+            return await message.reply_text("Only admins can use this command.")
 
-async def _set_many_locks(chat_id: int, lock_type: str, status: bool):
-    if lock_type == "all":
-        for item in VALID_LOCKS:
-            await db.set_lock(chat_id, item, status)
-        return VALID_LOCKS
+        if len(message.command) < 2:
+            return await message.reply_text(
+                "⚠️ Available: url, sticker, media, username, forward, all"
+            )
 
-    await db.set_lock(chat_id, lock_type, status)
-    return [lock_type]
+        lock_type = message.command[1].lower()
 
-
-def _has_url(message) -> bool:
-    text = message.text or message.caption or ""
-
-    # Telegram URL entities
-    for ent in (message.entities or message.caption_entities or []):
-        if ent.type in (MessageEntityType.URL, MessageEntityType.TEXT_LINK):
-            return True
-
-    # Plain links
-    return bool(re.search(r"(https?://|www\.|t\.me/|telegram\.me/)", text, flags=re.I))
-
-
-def _has_username(message) -> bool:
-    text = message.text or message.caption or ""
-    return bool(re.search(r"(^|\s)@[A-Za-z0-9_]{5,32}\b", text))
-
-
-def register_lock_system(app: Client):
-
-    @app.on_message(filters.group & filters.command("lock"), group=-10)
-    async def lock_command(client, message):
-        if not message.from_user or not await is_admin(client, message.chat.id, message.from_user.id):
-            return await message.reply_text("❌ Only admins can use this command.")
-
-        parts = message.text.split(maxsplit=1)
-        if len(parts) < 2:
-            return await message.reply_text(_usage_text())
-
-        lock_type = parts[1].lower().strip()
-        if lock_type not in ["all"] + VALID_LOCKS:
-            return await message.reply_text(f"⚠️ Available: all, {', '.join(VALID_LOCKS)}")
-
-        locked = await _set_many_locks(message.chat.id, lock_type, True)
         if lock_type == "all":
-            return await message.reply_text("🔒 Locked all.")
-        await message.reply_text(f"🔒 Locked {locked[0]}.")
+            await client.set_chat_permissions(
+                message.chat.id,
+                ChatPermissions(
+                    can_send_messages=False,
+                    can_send_media_messages=False,
+                    can_send_other_messages=False,
+                    can_add_web_page_previews=False,
+                    can_send_polls=False,
+                    can_invite_users=True,
+                    can_pin_messages=False,
+                    can_change_info=False,
+                ),
+            )
+            return await message.reply_text("Locked all.")
 
-    @app.on_message(filters.group & filters.command("unlock"), group=-10)
-    async def unlock_command(client, message):
-        if not message.from_user or not await is_admin(client, message.chat.id, message.from_user.id):
-            return await message.reply_text("❌ Only admins can use this command.")
+        if lock_type not in VALID_LOCKS:
+            return await message.reply_text(
+                "⚠️ Available: url, sticker, media, username, forward"
+            )
 
-        parts = message.text.split(maxsplit=1)
-        if len(parts) < 2:
-            return await message.reply_text(_usage_text())
+        return await message.reply_text(f"Locked {lock_type}.")
 
-        lock_type = parts[1].lower().strip()
-        if lock_type not in ["all"] + VALID_LOCKS:
-            return await message.reply_text(f"⚠️ Available: all, {', '.join(VALID_LOCKS)}")
+    @app.on_message(filters.command("unlock") & filters.group)
+    async def unlock_cmd(client, message):
+        if not await is_admin(client, message.chat.id, message.from_user.id):
+            return await message.reply_text("Only admins can use this command.")
 
-        unlocked = await _set_many_locks(message.chat.id, lock_type, False)
+        if len(message.command) < 2:
+            return await message.reply_text(
+                "⚠️ Available: url, sticker, media, username, forward, all"
+            )
+
+        lock_type = message.command[1].lower()
+
         if lock_type == "all":
-            return await message.reply_text("🔓 Unlocked all.")
-        await message.reply_text(f"🔓 Unlocked {unlocked[0]}.")
+            await client.set_chat_permissions(
+                message.chat.id,
+                ChatPermissions(
+                    can_send_messages=True,
+                    can_send_media_messages=True,
+                    can_send_other_messages=True,
+                    can_add_web_page_previews=True,
+                    can_send_polls=True,
+                    can_invite_users=True,
+                    can_pin_messages=False,
+                    can_change_info=False,
+                ),
+            )
+            return await message.reply_text("Unlocked all.")
 
-    @app.on_message(filters.group & filters.command("locks"), group=-10)
-    async def locks_list(client, message):
-        locks = await db.get_locks(message.chat.id) or {}
-        text = "🔐 **Locks:**\n\n"
-        for item in VALID_LOCKS:
-            text += f"• {item}: {'✅' if locks.get(item) else '❌'}\n"
-        await message.reply_text(text)
+        if lock_type not in VALID_LOCKS:
+            return await message.reply_text(
+                "⚠️ Available: url, sticker, media, username, forward"
+            )
 
-    @app.on_message(filters.group & ~filters.service, group=50)
-    async def enforce_locks(client, message):
-        if not message.from_user:
-            return
-
-        try:
-            if await is_admin(client, message.chat.id, message.from_user.id):
-                return
-        except Exception:
-            return
-
-        locks = await db.get_locks(message.chat.id) or {}
-        if not locks:
-            return
-
-        should_delete = False
-
-        if locks.get("url") and _has_url(message):
-            should_delete = True
-        elif locks.get("sticker") and message.sticker:
-            should_delete = True
-        elif locks.get("media") and (message.photo or message.video or message.document or message.animation or message.audio or message.voice or message.video_note):
-            should_delete = True
-        elif locks.get("username") and _has_username(message):
-            should_delete = True
-        elif locks.get("forward") and (message.forward_from or message.forward_from_chat or message.forward_sender_name):
-            should_delete = True
-
-        if should_delete:
-            try:
-                await message.delete()
-            except Exception as exc:
-                logger.warning("Failed to delete locked message: %s", exc)
+        return await message.reply_text(f"Unlocked {lock_type}.")
