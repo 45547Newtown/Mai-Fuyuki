@@ -23,3 +23,4 @@ def register_service_delete_plugin(app: Client) -> None:
     register_service_delete_commands(app)
     register_service_delete_watcher(app)
     logger.info("✅ ServiceDelete plugin fully loaded.")
+    
