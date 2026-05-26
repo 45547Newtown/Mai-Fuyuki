@@ -78,7 +78,7 @@ async def send_startup_log(client: Client) -> None:
         # ── Small caps startup message ───────────────────────
         caption = (
             "╔════════════════════╗\n"
-            "ɴᴏᴍᴀᴅᴇ ʜᴇʟᴘ ʙᴏᴛ\n"
+            "ʜɪᴍᴀᴡᴀʀɪ ʜᴇʟᴘ ʙᴏᴛ\n"
             "╚════════════════════╝\n\n"
             f"⌬ ꜱᴛᴀᴛᴜꜱ      : ᴏɴʟɪɴᴇ\n"
             f"⌬ ʙᴏᴛ         : {bot_name}\n"
@@ -89,9 +89,9 @@ async def send_startup_log(client: Client) -> None:
             f"⌬ ᴏꜱ          : {platform.system()} {platform.release()}\n\n"
             "━━━━━━━━━━━━━━━━━━\n\n"
             "⌬ ᴜᴘᴛɪᴍᴇ      : ᴀᴄᴛɪᴠᴇ\n"
-            "⌬ ᴍᴏᴅᴇ        : ɴᴏᴍᴀᴅᴇ ᴘᴏᴡᴇʀ\n\n"
+            "⌬ ᴍᴏᴅᴇ        : ʜɪᴍᴀᴡᴀʀɪ ᴘᴏᴡᴇʀ\n\n"
             "━━━━━━━━━━━━━━━━━━\n\n"
-            "ɴᴏᴍᴀᴅᴇ ꜱʏꜱᴛᴇᴍ\n"
+            "ʜɪᴍᴀᴡᴀʀɪ ꜱʏꜱᴛᴇᴍ\n"
             "ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ᴀᴄᴛɪᴠᴀᴛᴇᴅ\n\n"
             "╚════════════════════╝"
         )
@@ -135,3 +135,4 @@ async def log_command(client: Client, message) -> None:
         f"<b>Message:</b>\n<code>{_escape(text[:3500])}</code>"
     )
     await send_log(client, log_text)
+    
