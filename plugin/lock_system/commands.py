@@ -1,15 +1,8 @@
 from pyrogram import filters
 from pyrogram.enums import ChatMemberStatus
 from pyrogram.types import ChatPermissions
-import db
 
 VALID_LOCKS = ["url", "sticker", "media", "username", "forward"]
-
-PENDING_MSG = (
-    "⏳ <b>Approval Pending</b>\n\n"
-    "Yeh bot abhi is group mein approve nahi hua.\n"
-    "Admin se request hai ke log channel se ✅ Confirm karein."
-)
 
 
 async def can_use_lock(client, chat_id, user_id):
@@ -27,11 +20,8 @@ def register_lock_system(app):
         if not message.from_user:
             return
 
-        if not await db.is_group_approved(message.chat.id):
-            return await message.reply_text(PENDING_MSG, parse_mode="html")
-
         if not await can_use_lock(client, message.chat.id, message.from_user.id):
-            return await message.reply_text("❌ Only admins can use this command.")
+            return await message.reply_text("Only admins can use this command.")
 
         if len(message.command) < 2:
             return await message.reply_text("⚠️ Available: url, sticker, media, username, forward, all")
@@ -55,11 +45,8 @@ def register_lock_system(app):
         if not message.from_user:
             return
 
-        if not await db.is_group_approved(message.chat.id):
-            return await message.reply_text(PENDING_MSG, parse_mode="html")
-
         if not await can_use_lock(client, message.chat.id, message.from_user.id):
-            return await message.reply_text("❌ Only admins can use this command.")
+            return await message.reply_text("Only admins can use this command.")
 
         if len(message.command) < 2:
             return await message.reply_text("⚠️ Available: url, sticker, media, username, forward, all")
@@ -84,4 +71,3 @@ def register_lock_system(app):
             return await message.reply_text("⚠️ Available: url, sticker, media, username, forward, all")
 
         return await message.reply_text(f"🔓 Unlocked {lock_type}.")
-        
