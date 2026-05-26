@@ -8,7 +8,7 @@
 # ============================================================
 
 from pyrogram import Client, filters
-from pyrogram.types import Message, ChatMemberUpdated, ChatPermissions, ChatPrivileges
+from pyrogram.types import Message, ChatMemberUpdated, ChatPermissions, ChatPrivileges, InlineKeyboardMarkup, InlineKeyboardButton
 from pyrogram.enums import ChatMemberStatus
 from pyrogram.raw import types
 import logging
@@ -55,6 +55,15 @@ async def handle_welcome(client, chat_id: int, users: list, chat_title: str):
         return
 
     welcome_text = await db.get_welcome_message(chat_id) or DEFAULT_WELCOME
+    saved_buttons = await db.get_welcome_buttons(chat_id)
+
+    # Build inline keyboard if buttons are saved
+    reply_markup = None
+    if saved_buttons:
+        keyboard = []
+        for btn in saved_buttons:
+            keyboard.append([InlineKeyboardButton(btn["text"], url=btn["url"])])
+        reply_markup = InlineKeyboardMarkup(keyboard)
 
     for user in users:
         try:
@@ -68,7 +77,7 @@ async def handle_welcome(client, chat_id: int, users: list, chat_title: str):
             text = DEFAULT_WELCOME.format(first_name=user.first_name, title=chat_title)
 
         try:
-            await client.send_message(chat_id, text)
+            await client.send_message(chat_id, text, reply_markup=reply_markup)
         except Exception as e:
             logger.error(f"🚨 Failed to send welcome message: {e}")
 
@@ -136,7 +145,9 @@ def register_group_commands(app: Client):
     
         await db.set_welcome_message(message.chat.id, parts[1])
         await message.reply_text("✅ Custom welcome saved!")
-    
+
+
+
     
     # ==========================================================
     # kick
