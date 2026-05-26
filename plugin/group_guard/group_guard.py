@@ -72,9 +72,12 @@ def register_group_guard(app):
             # Notify the group that approval is needed
             await _notify_group(
                 client, group_id,
-                "⏳ *This group is pending approval.*\n\n"
-                "Commands and features are disabled until an admin approves this group.\n"
-                "The bot owner has been notified."
+                "ᴛʜɪꜱ ɢʀᴏᴜᴘ ɪꜱ ᴜɴᴅᴇʀ ᴠᴇʀɪꜰɪᴄᴀᴛɪᴏɴ\n\n"
+                "━━━━━━━━━━━━━━━━\n\n"
+                "ʙᴏᴛ ᴄᴏᴍᴍᴀɴᴅꜱ ᴀʀᴇ ᴄᴜʀʀᴇɴᴛʟʏ ᴅɪꜱᴀʙʟᴇᴅ.\n\n"
+                "ᴀᴘᴘʀᴏᴠᴀʟ ɪꜱ ʀᴇQᴜɪʀᴇᴅ ʙᴇꜰᴏʀᴇ\n"
+                "ᴜꜱɪɴɢ ᴀɴʏ ꜰᴇᴀᴛᴜʀᴇꜱ.\n\n"
+                "━━━━━━━━━━━━━━━━"
             )
 
             # Build log channel message
@@ -129,7 +132,12 @@ def register_group_guard(app):
         # Notify the group
         await _notify_group(
             client, group_id,
-            "✅ *This group has been approved!*\n\nAll commands and features are now active."
+            "ɢʀᴏᴜᴘ ᴠᴇʀɪꜰɪᴇᴅ ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ\n\n"
+            "━━━━━━━━━━━━━━━━\n\n"
+            "ᴀʟʟ ᴄᴏᴍᴍᴀɴᴅꜱ ᴀɴᴅ ꜰᴇᴀᴛᴜʀᴇꜱ\n"
+            "ᴀʀᴇ ɴᴏᴡ ᴀᴄᴛɪᴠᴇ.\n\n"
+            "ᴛʜᴀɴᴋ ʏᴏᴜ ꜰᴏʀ ᴄʜᴏᴏꜱɪɴɢ ᴛʜɪꜱ ʙᴏᴛ.\n\n"
+            "━━━━━━━━━━━━━━━━"
         )
 
     # ── 3. Reject callback ────────────────────────────────────
@@ -147,7 +155,12 @@ def register_group_guard(app):
         # Notify group before leaving
         await _notify_group(
             client, group_id,
-            "❌ This group was *rejected*. The bot will now leave."
+            "ɢʀᴏᴜᴘ ᴀᴄᴄᴇꜱꜱ ᴅᴇɴɪᴇᴅ\n\n"
+            "━━━━━━━━━━━━━━━━\n\n"
+            "ᴛʜɪꜱ ɢʀᴏᴜᴘ ᴅᴏᴇꜱ ɴᴏᴛ ᴍᴇᴇᴛ\n"
+            "ᴛʜᴇ ʀᴇQᴜɪʀᴇᴅ ᴄᴏɴᴅɪᴛɪᴏɴꜱ.\n\n"
+            "ʙᴏᴛ ꜱᴇʀᴠɪᴄᴇꜱ ʜᴀᴠᴇ ʙᴇᴇɴ ᴅɪꜱᴀʙʟᴇᴅ.\n\n"
+            "━━━━━━━━━━━━━━━━"
         )
 
         # Leave the group
