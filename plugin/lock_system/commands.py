@@ -1,6 +1,8 @@
 from pyrogram import filters
 from pyrogram.enums import ChatMemberStatus
 from pyrogram.types import ChatPermissions
+import db
+from plugin.group_guard.group_guard import group_is_approved
 
 VALID_LOCKS = ["url", "sticker", "media", "username", "forward"]
 
@@ -27,6 +29,9 @@ def register_lock_system(app):
 
         if not message.from_user:
             return
+
+        if not await group_is_approved(message.chat.id):
+            return await message.reply_text("⏳ This group is **pending approval**. Commands are disabled.")
 
         if not await can_use_lock(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admins can use this command.")
@@ -109,6 +114,9 @@ def register_lock_system(app):
 
         if not message.from_user:
             return
+
+        if not await group_is_approved(message.chat.id):
+            return await message.reply_text("⏳ This group is **pending approval**. Commands are disabled.")
 
         if not await can_use_lock(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admins can use this command.")
