@@ -1,14 +1,23 @@
 # ============================================================
 # Group Manager Bot
+# Fixed Welcome + Welcome Buttons
 # ============================================================
 
 from pyrogram import Client, filters
-from pyrogram.types import Message, ChatMemberUpdated, ChatPermissions, ChatPrivileges, InlineKeyboardMarkup, InlineKeyboardButton
+from pyrogram.types import (
+    Message,
+    ChatMemberUpdated,
+    ChatPermissions,
+    ChatPrivileges,
+    InlineKeyboardMarkup,
+    InlineKeyboardButton,
+)
 from pyrogram.enums import ChatMemberStatus
 import logging
+import re
 import db
 
-DEFAULT_WELCOME = "👋 Welcome {first_name} to {title}!"
+DEFAULT_WELCOME = "👋 Welcome {mention} to {title}!"
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -19,20 +28,111 @@ async def is_power(client, chat_id: int, user_id: int) -> bool:
     return member.status in [ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.OWNER]
 
 
-async def extract_target_user(client, message):
+async def extract_target_user(client, message: Message):
     if message.reply_to_message:
         return message.reply_to_message.from_user
+
     parts = message.text.split(maxsplit=1)
     if len(parts) < 2:
         return None
-    arg = parts[1]
+
+    arg = parts[1].strip()
     try:
         if arg.startswith("@"):
             return await client.get_users(arg)
-        elif arg.isdigit():
+        if arg.isdigit():
             return await client.get_users(int(arg))
-    except:
+    except Exception:
         return None
+
+
+def is_valid_url(url: str) -> bool:
+    return url.startswith(("http://", "https://", "tg://"))
+
+
+def parse_button_lines(raw_text: str):
+    """
+    Supported formats:
+
+    1 button:
+    /setwelcomebutton Main Channel | https://t.me/shinchan_leech
+
+    Multiple buttons:
+    /setwelcomebutton
+    YouTube Channel | https://youtube.com/xxx
+    Tutorial Channel | https://t.me/xxx
+
+    2 buttons in one row:
+    Button 1 | https://link1.com && Button 2 | https://link2.com
+    """
+    rows = []
+    errors = []
+
+    for line in raw_text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+
+        row = []
+        parts = [p.strip() for p in line.split("&&") if p.strip()]
+
+        for part in parts:
+            if "|" not in part:
+                errors.append(f"❌ `{part}` — format galat hai. Use: Button Name | https://link.com")
+                continue
+
+            name, url = part.split("|", 1)
+            name = name.strip()
+            url = url.strip()
+
+            if not name:
+                errors.append(f"❌ Button name empty hai: `{part}`")
+                continue
+
+            if not is_valid_url(url):
+                errors.append(f"❌ Invalid URL `{url}` — URL http://, https:// ya tg:// se start hona chahiye")
+                continue
+
+            row.append({"text": name, "url": url})
+
+        if row:
+            rows.append(row)
+
+    return rows, errors
+
+
+async def build_welcome_keyboard(chat_id: int):
+    saved_rows = await db.get_welcome_buttons(chat_id)
+    if not saved_rows:
+        return None
+
+    keyboard = []
+
+    # Old database support: [{"text": "...", "url": "..."}]
+    if isinstance(saved_rows, list) and saved_rows and isinstance(saved_rows[0], dict):
+        for btn in saved_rows:
+            text = btn.get("text")
+            url = btn.get("url")
+            if text and url and is_valid_url(url):
+                keyboard.append([InlineKeyboardButton(text, url=url)])
+
+    # New database support: [[{"text": "...", "url": "..."}]]
+    elif isinstance(saved_rows, list):
+        for row in saved_rows:
+            if not isinstance(row, list):
+                continue
+            btn_row = []
+            for btn in row:
+                if not isinstance(btn, dict):
+                    continue
+                text = btn.get("text")
+                url = btn.get("url")
+                if text and url and is_valid_url(url):
+                    btn_row.append(InlineKeyboardButton(text, url=url))
+            if btn_row:
+                keyboard.append(btn_row)
+
+    return InlineKeyboardMarkup(keyboard) if keyboard else None
 
 
 async def handle_welcome(client, chat_id: int, users: list, chat_title: str):
@@ -41,132 +141,161 @@ async def handle_welcome(client, chat_id: int, users: list, chat_title: str):
         return
 
     welcome_text = await db.get_welcome_message(chat_id) or DEFAULT_WELCOME
-    saved_buttons = await db.get_welcome_buttons(chat_id)
-
-    reply_markup = None
-    if saved_buttons:
-        # Fix: sirf valid buttons use karo (empty text/url crash karta hai)
-        valid_buttons = [btn for btn in saved_buttons if btn.get("text") and btn.get("url")]
-        if valid_buttons:
-            keyboard = [[InlineKeyboardButton(btn["text"], url=btn["url"])] for btn in valid_buttons]
-            reply_markup = InlineKeyboardMarkup(keyboard)
+    reply_markup = await build_welcome_keyboard(chat_id)
 
     for user in users:
         try:
             text = welcome_text.format(
-                username=user.username or user.first_name,
-                first_name=user.first_name,
-                mention=f"[{user.first_name}](tg://user?id={user.id})",
-                title=chat_title,
+                first_name=user.first_name or "",
+                last_name=user.last_name or "",
+                username=user.username or user.first_name or "",
+                mention=user.mention,
+                id=user.id,
+                title=chat_title or "",
             )
-        except KeyError:
-            text = DEFAULT_WELCOME.format(first_name=user.first_name, title=chat_title)
+        except Exception as e:
+            logger.warning("Welcome format error: %s", e)
+            text = DEFAULT_WELCOME.format(
+                mention=user.mention,
+                title=chat_title or "",
+            )
 
         try:
-            await client.send_message(chat_id, text, reply_markup=reply_markup)
+            await client.send_message(
+                chat_id,
+                text,
+                reply_markup=reply_markup,
+                disable_web_page_preview=True,
+            )
         except Exception as e:
-            logger.error(f"Failed to send welcome: {e}")
+            logger.error("Failed to send welcome: %s", e)
 
 
 def register_group_commands(app: Client):
 
-    # welcome event
     @app.on_chat_member_updated()
     async def member_update(client: Client, cmu: ChatMemberUpdated):
         if not cmu.new_chat_member:
             return
+
         user = cmu.new_chat_member.user
-        if cmu.new_chat_member.status == ChatMemberStatus.MEMBER:
+        old_status = cmu.old_chat_member.status if cmu.old_chat_member else None
+        new_status = cmu.new_chat_member.status
+
+        if new_status == ChatMemberStatus.MEMBER and old_status != ChatMemberStatus.MEMBER:
             await handle_welcome(client, cmu.chat.id, [user], cmu.chat.title)
 
-    # /welcome on/off
+    @app.on_message(filters.group & filters.new_chat_members)
+    async def new_member_message(client: Client, message: Message):
+        await handle_welcome(
+            client,
+            message.chat.id,
+            message.new_chat_members,
+            message.chat.title,
+        )
+
     @app.on_message(filters.group & filters.command("welcome"))
     async def welcome_toggle(client, message: Message):
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
+
         parts = message.text.split(maxsplit=1)
         if len(parts) < 2 or parts[1].lower() not in ["on", "off"]:
             return await message.reply_text("Usage: /welcome on or /welcome off")
+
         status = parts[1].lower() == "on"
         await db.set_welcome_status(message.chat.id, status)
         await message.reply_text("✅ Welcome messages ON." if status else "⚠️ Welcome messages OFF.")
 
-    # /setwelcome
     @app.on_message(filters.group & filters.command("setwelcome"))
     async def set_welcome(client, message: Message):
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
+
         parts = message.text.split(maxsplit=1)
         if len(parts) < 2:
-            return await message.reply_text("Usage: /setwelcome <message>")
+            return await message.reply_text(
+                "Usage:\n"
+                "/setwelcome Hey {mention}\n"
+                "Welcome To {title}"
+            )
+
         await db.set_welcome_message(message.chat.id, parts[1])
         await message.reply_text("✅ Custom welcome saved!")
 
-    # /setwelcomebutton
     @app.on_message(filters.group & filters.command("setwelcomebutton"))
     async def set_welcome_button(client, message: Message):
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
+
         parts = message.text.split(maxsplit=1)
         if len(parts) < 2:
             return await message.reply_text(
-                "Usage:\n/setwelcomebutton Button Name | https://youtube.com\n\n"
-                "Multiple buttons — har ek naye line pe:\n"
-                "Main Channel | https://t.me/mychannel\n"
-                "Support | https://t.me/support"
+                "✅ Sahi format:\n"
+                "/setwelcomebutton Main Channel | https://t.me/shinchan_leech\n\n"
+                "Multiple buttons:\n"
+                "/setwelcomebutton\n"
+                "YouTube Channel | https://youtube.com/@yourchannel\n"
+                "Tutorial Channel | https://t.me/tutorial\n\n"
+                "Same row buttons:\n"
+                "Button 1 | https://link1.com && Button 2 | https://link2.com"
             )
-        buttons = []
-        errors = []
-        for line in parts[1].strip().split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-            if "|" not in line:
-                errors.append(f"❌ `{line}` — '|' separator missing hai. Format: Name | URL")
-                continue
-            sp = line.split("|", 1)
-            text = sp[0].strip()
-            url = sp[1].strip()
-            # Fix: text empty nahi hona chahiye
-            if not text:
-                errors.append(f"❌ Button name empty hai: `{line}`")
-                continue
-            # Fix: http aur tg:// dono valid hain
-            if not (url.startswith("http://") or url.startswith("https://") or url.startswith("tg://")):
-                errors.append(f"❌ Invalid URL `{url}` — https:// ya tg:// se shuru karo")
-                continue
-            buttons.append({"text": text, "url": url})
-        if not buttons:
-            err_msg = "⚠️ Koi valid button nahi mila.\n\n"
-            err_msg += "✅ Sahi format:\n`/setwelcomebutton Main Channel | https://t.me/mychannel`\n\n"
+
+        rows, errors = parse_button_lines(parts[1])
+
+        if not rows:
+            msg = (
+                "⚠️ Koi valid button nahi mila.\n\n"
+                "Format: Button Name | https://link.com\n\n"
+                "Example:\n"
+                "/setwelcomebutton Main Channel | https://t.me/shinchan_leech"
+            )
             if errors:
-                err_msg += "Errors:\n" + "\n".join(errors)
-            return await message.reply_text(err_msg)
-        await db.set_welcome_buttons(message.chat.id, buttons)
-        btn_list = "\n".join([f"• {b['text']} → {b['url']}" for b in buttons])
-        reply = f"✅ {len(buttons)} button(s) save ho gaye!\n\n{btn_list}"
+                msg += "\n\nErrors:\n" + "\n".join(errors)
+            return await message.reply_text(msg, disable_web_page_preview=True)
+
+        await db.set_welcome_buttons(message.chat.id, rows)
+
+        total = sum(len(row) for row in rows)
+        btn_list = []
+        for row in rows:
+            btn_list.append(" | ".join([f"{b['text']} → {b['url']}" for b in row]))
+
+        reply = f"✅ {total} welcome button(s) save ho gaye!\n\n" + "\n".join(btn_list)
         if errors:
             reply += "\n\n⚠️ Kuch lines skip hui:\n" + "\n".join(errors)
-        await message.reply_text(reply)
 
-    # /clearwelcomebutton
+        await message.reply_text(reply, disable_web_page_preview=True)
+
     @app.on_message(filters.group & filters.command("clearwelcomebutton"))
     async def clear_welcome_button(client, message: Message):
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
+
         await db.clear_welcome_buttons(message.chat.id)
         await message.reply_text("🗑️ Welcome buttons hata diye gaye!")
 
-    # /welcomebuttons
     @app.on_message(filters.group & filters.command("welcomebuttons"))
     async def show_welcome_buttons(client, message: Message):
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
+
         saved = await db.get_welcome_buttons(message.chat.id)
         if not saved:
             return await message.reply_text("ℹ️ Koi welcome button set nahi hai.")
-        btn_list = "\n".join([f"{i+1}. {b['text']} → {b['url']}" for i, b in enumerate(saved)])
-        await message.reply_text(f"📋 Current buttons ({len(saved)}):\n\n{btn_list}")
+
+        lines = []
+        if saved and isinstance(saved[0], dict):
+            for i, b in enumerate(saved, 1):
+                lines.append(f"{i}. {b['text']} → {b['url']}")
+        else:
+            n = 1
+            for row in saved:
+                for b in row:
+                    lines.append(f"{n}. {b['text']} → {b['url']}")
+                    n += 1
+
+        await message.reply_text("📋 Current buttons:\n\n" + "\n".join(lines), disable_web_page_preview=True)
 
     # /kick
     @app.on_message(filters.group & filters.command("kick"))
