@@ -1,16 +1,13 @@
 from handlers.start import register_handlers
-
-from plugin.lock_system import register_all_lock_plugins
-from plugin.welcome_system import register_welcome_system
+from plugin.lock_system import *
+from plugin.welcome_system import *
+from plugin.group_guard import *
 
 
 def register_all_handlers(app):
 
-    # Start system
+    # Start Handler
     register_handlers(app)
 
-    # Lock system
-    register_all_lock_plugins(app)
-
-    # Welcome system
-    register_welcome_system(app)
+    # Plugins auto loaded
+    print("✅ All handlers loaded successfully")
