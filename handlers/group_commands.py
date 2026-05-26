@@ -45,8 +45,11 @@ async def handle_welcome(client, chat_id: int, users: list, chat_title: str):
 
     reply_markup = None
     if saved_buttons:
-        keyboard = [[InlineKeyboardButton(btn["text"], url=btn["url"])] for btn in saved_buttons]
-        reply_markup = InlineKeyboardMarkup(keyboard)
+        # Fix: sirf valid buttons use karo (empty text/url crash karta hai)
+        valid_buttons = [btn for btn in saved_buttons if btn.get("text") and btn.get("url")]
+        if valid_buttons:
+            keyboard = [[InlineKeyboardButton(btn["text"], url=btn["url"])] for btn in valid_buttons]
+            reply_markup = InlineKeyboardMarkup(keyboard)
 
     for user in users:
         try:
@@ -107,9 +110,10 @@ def register_group_commands(app: Client):
         parts = message.text.split(maxsplit=1)
         if len(parts) < 2:
             return await message.reply_text(
-                "Usage:\n/setwelcomebutton YouTube Channel | https://youtube.com\n\n"
+                "Usage:\n/setwelcomebutton Button Name | https://youtube.com\n\n"
                 "Multiple buttons — har ek naye line pe:\n"
-                "/setwelcomebutton YouTube Channel | https://youtube.com\nTutorial Channel | https://t.me/channel"
+                "Main Channel | https://t.me/mychannel\n"
+                "Support | https://t.me/support"
             )
         buttons = []
         errors = []
@@ -118,22 +122,31 @@ def register_group_commands(app: Client):
             if not line:
                 continue
             if "|" not in line:
-                errors.append(f"❌ {line} — | missing")
+                errors.append(f"❌ `{line}` — '|' separator missing hai. Format: Name | URL")
                 continue
             sp = line.split("|", 1)
             text = sp[0].strip()
             url = sp[1].strip()
-            if not url.startswith("http"):
-                errors.append(f"❌ Invalid URL: {url}")
+            # Fix: text empty nahi hona chahiye
+            if not text:
+                errors.append(f"❌ Button name empty hai: `{line}`")
+                continue
+            # Fix: http aur tg:// dono valid hain
+            if not (url.startswith("http://") or url.startswith("https://") or url.startswith("tg://")):
+                errors.append(f"❌ Invalid URL `{url}` — https:// ya tg:// se shuru karo")
                 continue
             buttons.append({"text": text, "url": url})
         if not buttons:
-            return await message.reply_text("⚠️ Koi valid button nahi mila.\nFormat: Name | https://link.com")
+            err_msg = "⚠️ Koi valid button nahi mila.\n\n"
+            err_msg += "✅ Sahi format:\n`/setwelcomebutton Main Channel | https://t.me/mychannel`\n\n"
+            if errors:
+                err_msg += "Errors:\n" + "\n".join(errors)
+            return await message.reply_text(err_msg)
         await db.set_welcome_buttons(message.chat.id, buttons)
         btn_list = "\n".join([f"• {b['text']} → {b['url']}" for b in buttons])
         reply = f"✅ {len(buttons)} button(s) save ho gaye!\n\n{btn_list}"
         if errors:
-            reply += "\n\n" + "\n".join(errors)
+            reply += "\n\n⚠️ Kuch lines skip hui:\n" + "\n".join(errors)
         await message.reply_text(reply)
 
     # /clearwelcomebutton
