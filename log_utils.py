@@ -7,14 +7,10 @@ from typing import Optional, Union
 import aiohttp
 from pyrogram import Client
 
-from config import LOG_CHAT_ID, START_IMAGE, BOT_USERNAME, BOT_TOKEN
+from config import LOG_CHAT_ID, BOT_USERNAME, BOT_TOKEN
 
 logger = logging.getLogger(__name__)
 
-# Important: Pyrogram/MTProto often throws "Peer id invalid" for private
-# channels when only a numeric -100... id is known. Telegram Bot API can send
-# to the same -100... id as long as the bot is admin/member, so all log-channel
-# messages are sent via Bot API instead of client.send_message().
 _LOG_DISABLED = False
 
 
@@ -41,7 +37,6 @@ async def _bot_api(method: str, payload: dict) -> tuple[bool, str]:
                 if data.get("ok"):
                     return True, "ok"
                 desc = data.get("description", str(data))
-                # Disable only for permanent chat-id/access errors so Render logs stay clean.
                 lowered = desc.lower()
                 if any(x in lowered for x in ["chat not found", "bot was kicked", "not enough rights", "forbidden"]):
                     _LOG_DISABLED = True
@@ -51,11 +46,6 @@ async def _bot_api(method: str, payload: dict) -> tuple[bool, str]:
 
 
 async def send_log(client: Client, text: str, *, disable_web_page_preview: bool = True) -> bool:
-    """Send a text log to LOG_CHAT_ID using Telegram Bot API.
-
-    Works for private channels/groups with numeric -100... IDs when the bot is
-    added as admin/member. This avoids Pyrogram's MTProto peer-cache issue.
-    """
     chat_id = _chat_id()
     if not chat_id:
         return False
@@ -74,47 +64,51 @@ async def send_log(client: Client, text: str, *, disable_web_page_preview: bool 
 
 
 async def send_startup_log(client: Client) -> None:
-    """CipherElite-style startup report for NomadeHelpBot."""
+    """Startup report — plain text, small caps style, no image."""
     chat_id = _chat_id()
     if not chat_id:
         return
 
     try:
         bot = await client.get_me()
-        bot_name = _escape(bot.first_name or BOT_USERNAME)
-        bot_username = f"@{bot.username}" if bot.username else _escape(BOT_USERNAME)
-        started_at = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC")
+        bot_name     = bot.first_name or BOT_USERNAME
+        bot_username = f"@{bot.username}" if bot.username else BOT_USERNAME
         pyrogram_version = __import__("pyrogram").__version__
 
+        # ── Small caps startup message ───────────────────────
         caption = (
-            "<b>=====================</b>\n"
-            "<b>NOMADE HELP BOT</b>\n"
-            "<b>=====================</b>\n"
-            "<b>Status</b>: ONLINE ✅\n"
-            f"<b>Bot</b>: {bot_name} (<code>{bot.id}</code>)\n"
-            f"<b>Username</b>: {_escape(bot_username)}\n"
-            f"<b>Python</b>: v{platform.python_version()}\n"
-            f"<b>Pyrogram</b>: v{pyrogram_version}\n"
-            f"<b>OS</b>: {_escape(platform.system())} {_escape(platform.release())}\n"
-            f"<b>Started</b>: {started_at}\n"
-            "<b>=====================</b>\n"
-            "<b>Nomade Power Activated!</b>"
+            "╔════════════════════╗\n"
+            "ɴᴏᴍᴀᴅᴇ ʜᴇʟᴘ ʙᴏᴛ\n"
+            "╚════════════════════╝\n\n"
+            f"⌬ ꜱᴛᴀᴛᴜꜱ      : ᴏɴʟɪɴᴇ\n"
+            f"⌬ ʙᴏᴛ         : {bot_name}\n"
+            f"⌬ ᴜꜱᴇʀɴᴀᴍᴇ    : {bot_username}\n\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            f"⌬ ᴘʏᴛʜᴏɴ      : v{platform.python_version()}\n"
+            f"⌬ ᴘʏʀᴏɢʀᴀᴍ    : v{pyrogram_version}\n"
+            f"⌬ ᴏꜱ          : {platform.system()} {platform.release()}\n\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "⌬ ᴜᴘᴛɪᴍᴇ      : ᴀᴄᴛɪᴠᴇ\n"
+            "⌬ ᴍᴏᴅᴇ        : ɴᴏᴍᴀᴅᴇ ᴘᴏᴡᴇʀ\n\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "ɴᴏᴍᴀᴅᴇ ꜱʏꜱᴛᴇᴍ\n"
+            "ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ᴀᴄᴛɪᴠᴀᴛᴇᴅ\n\n"
+            "╚════════════════════╝"
         )
 
-        # Try photo first; if the image URL/file is invalid, send text instead.
+        # Send as plain text — no image
         ok, info = await _bot_api(
-            "sendPhoto",
+            "sendMessage",
             {
                 "chat_id": str(chat_id),
-                "photo": START_IMAGE,
-                "caption": caption,
+                "text": caption,
                 "parse_mode": "HTML",
+                "disable_web_page_preview": "true",
             },
         )
         if not ok:
-            ok2 = await send_log(client, caption)
-            if not ok2:
-                logger.info("Startup log skipped: %s", info)
+            logger.info("Startup log skipped: %s", info)
+
     except Exception as exc:
         logger.info("Startup log skipped: %s", exc)
 
