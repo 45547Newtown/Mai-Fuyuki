@@ -2,21 +2,9 @@
 # Group Manager Bot — Auto Delete System
 # plugin/autodelete_system/commands.py
 #
-# Supports:
-#   /autodelete_on            – Enable with last saved settings
-#   /autodelete_off           – Disable auto delete
-#   /autodelete_1day          – Delete messages after 1 day
-#   /autodelete_1week         – Delete messages after 1 week
-#   /autodelete_1month        – Delete messages after 1 month
-#   /autodelete_custom        – Prompt for custom time (10m, 12h, 7d)
-#   /autodelete_media_1day    – Delete media after 1 day
-#   /autodelete_media_1week   – Delete media after 1 week
-#   /autodelete_media_1month  – Delete media after 1 month
-#   /autodelete_all_1day      – Delete msgs + media after 1 day
-#   /autodelete_all_1week     – Delete msgs + media after 1 week
-#   /autodelete_all_1month    – Delete msgs + media after 1 month
-#
-# Admin-only. Shows inline quick-select buttons.
+# Clean 4-button keyboard: 1 Day | 1 Week | 1 Month | Custom
+# Deletes: text, photos, videos, documents, stickers, charts
+# Admin-only. All message types covered.
 # ============================================================
 
 import re
@@ -43,14 +31,13 @@ SECONDS_1DAY   = 86_400
 SECONDS_1WEEK  = 604_800
 SECONDS_1MONTH = 2_592_000   # 30 days
 
-# Users waiting for a custom time input  {chat_id: user_id}
+# Waiting for custom input: {chat_id: user_id}
 _awaiting_custom: dict[int, int] = {}
 
 
 # ── Helpers ────────────────────────────────────────────────
 
 def _format_duration(seconds: int) -> str:
-    """Return a human-readable duration string."""
     if seconds >= SECONDS_1MONTH:
         return f"{seconds // SECONDS_1MONTH} month(s)"
     if seconds >= SECONDS_1WEEK:
@@ -63,10 +50,6 @@ def _format_duration(seconds: int) -> str:
 
 
 def _parse_custom_time(text: str) -> int | None:
-    """
-    Parse user input like '10m', '12h', '7d', '2w', '1mo'.
-    Returns seconds, or None if unrecognised.
-    """
     text = text.strip().lower()
     match = re.fullmatch(r"(\d+)(m|h|d|w|mo)", text)
     if not match:
@@ -77,7 +60,6 @@ def _parse_custom_time(text: str) -> int | None:
 
 
 async def _is_admin(client: Client, chat_id: int, user_id: int) -> bool:
-    """Return True if user is an admin or creator in the chat."""
     try:
         member = await client.get_chat_member(chat_id, user_id)
         return member.status in (
@@ -88,94 +70,98 @@ async def _is_admin(client: Client, chat_id: int, user_id: int) -> bool:
         return False
 
 
+# ── Clean 4-button keyboard (proper sizing) ───────────────
+
 def _main_keyboard() -> InlineKeyboardMarkup:
-    """Quick-select inline keyboard shown with every autodelete command."""
+    """
+    4 time buttons in 2x2 grid + Turn Off full width.
+    Short labels = buttons fit perfectly on all screen sizes.
+    """
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("⏱ 1 Day",    callback_data="ad:msg:1d"),
-            InlineKeyboardButton("📅 1 Week",   callback_data="ad:msg:1w"),
-            InlineKeyboardButton("🗓 1 Month",  callback_data="ad:msg:1mo"),
+            InlineKeyboardButton("⏱ 1 Day",    callback_data="ad:1d"),
+            InlineKeyboardButton("📅 1 Week",   callback_data="ad:1w"),
         ],
         [
-            InlineKeyboardButton("🖼 Media – 1 Day",   callback_data="ad:media:1d"),
-            InlineKeyboardButton("🖼 Media – 1 Week",  callback_data="ad:media:1w"),
+            InlineKeyboardButton("🗓 1 Month",  callback_data="ad:1mo"),
+            InlineKeyboardButton("✏️ Custom",   callback_data="ad:custom"),
         ],
         [
-            InlineKeyboardButton("📦 All – 1 Day",    callback_data="ad:all:1d"),
-            InlineKeyboardButton("📦 All – 1 Week",   callback_data="ad:all:1w"),
-            InlineKeyboardButton("📦 All – 1 Month",  callback_data="ad:all:1mo"),
-        ],
-        [
-            InlineKeyboardButton("✏️ Custom Time",   callback_data="ad:custom"),
-            InlineKeyboardButton("🔴 Turn Off",       callback_data="ad:off"),
+            InlineKeyboardButton("🔴 Turn Off", callback_data="ad:off"),
         ],
     ])
 
 
-def _mode_label(mode: str) -> str:
-    labels = {"messages": "Messages", "media": "Media Only", "all": "Messages & Media"}
-    return labels.get(mode, mode.title())
-
-
-async def _apply_and_reply(
-    client: Client,
-    message: Message,
-    mode: str,
-    seconds: int,
-):
-    """Save config and send formatted confirmation."""
-    chat_id = message.chat.id
-    await set_autodelete(chat_id, mode, seconds, enabled=True)
-
-    duration = _format_duration(seconds)
-    mode_text = _mode_label(mode)
-
-    text = (
+def _confirm_text(duration: str, seconds: int) -> str:
+    return (
         f"✅ **Auto Delete Enabled**\n\n"
-        f"🗑️ **Scope :** {mode_text}\n"
-        f"⏳ **Delete after :** {duration}\n\n"
-        f"New {mode_text.lower()} will be automatically deleted "
-        f"after **{duration}**.\n\n"
-        f"_Use /autodelete\\_off to disable._"
+        f"🗑️ New messages, photos, videos, files & stickers\n"
+        f"⏳ will be deleted after **{duration}**\n\n"
+        f"━━━━━━━━━━━━━━━━\n"
+        f"_Use /autodelete\\_off to disable_"
     )
-    await message.reply_text(text, reply_markup=_main_keyboard())
 
 
-# ── Admin guard decorator ──────────────────────────────────
+# ── Admin-only decorator ───────────────────────────────────
 
 def admin_only(func):
-    """Decorator: silently ignore non-admins."""
     async def wrapper(client: Client, message: Message):
         if message.chat.type.value == "private":
-            await message.reply_text("⚠️ This command only works in groups/channels.")
+            await message.reply_text("⚠️ Groups/channels only.")
             return
         if not await _is_admin(client, message.chat.id, message.from_user.id):
-            await message.reply_text("🚫 Only group admins can use this command.")
+            await message.reply_text("🚫 Admins only.")
             return
         await func(client, message)
     return wrapper
 
 
-# ── Command handlers ───────────────────────────────────────
+# ── Apply + reply helper ───────────────────────────────────
+
+async def _apply_and_reply(client: Client, message: Message, seconds: int):
+    await set_autodelete(message.chat.id, "all", seconds, enabled=True)
+    duration = _format_duration(seconds)
+    await message.reply_text(
+        _confirm_text(duration, seconds),
+        reply_markup=_main_keyboard(),
+    )
+
+
+# ── /autodelete — main menu ────────────────────────────────
+
+@admin_only
+async def cmd_autodelete(client: Client, message: Message):
+    cfg = await get_autodelete(message.chat.id)
+    if cfg["enabled"]:
+        status = f"🟢 **Active** — deletes after {_format_duration(cfg['seconds'])}"
+    else:
+        status = "🔴 **Inactive**"
+
+    await message.reply_text(
+        f"🗑️ **Auto Delete Settings**\n\n"
+        f"Status: {status}\n\n"
+        f"Choose how long messages stay:",
+        reply_markup=_main_keyboard(),
+    )
+
+
+# ── ON / OFF ───────────────────────────────────────────────
 
 @admin_only
 async def cmd_autodelete_on(client: Client, message: Message):
     cfg = await get_autodelete(message.chat.id)
     if cfg["seconds"] == 0:
-        await set_autodelete(message.chat.id, "all", SECONDS_1DAY, enabled=True)
-        cfg = {"mode": "all", "seconds": SECONDS_1DAY}
-
+        cfg["seconds"] = SECONDS_1DAY
+        cfg["mode"] = "all"
     await set_autodelete(message.chat.id, cfg["mode"], cfg["seconds"], enabled=True)
     duration = _format_duration(cfg["seconds"])
-    mode_text = _mode_label(cfg["mode"])
-
-    text = (
+    await message.reply_text(
         f"✅ **Auto Delete Re-enabled**\n\n"
-        f"🗑️ **Scope :** {mode_text}\n"
-        f"⏳ **Delete after :** {duration}\n\n"
-        f"_Use /autodelete\\_off to disable._"
+        f"🗑️ Messages, photos, videos, files\n"
+        f"⏳ Delete after: **{duration}**\n\n"
+        f"_Use /autodelete\\_off to disable_",
+        reply_markup=_main_keyboard(),
     )
-    await message.reply_text(text, reply_markup=_main_keyboard())
 
 
 @admin_only
@@ -183,71 +169,44 @@ async def cmd_autodelete_off(client: Client, message: Message):
     await disable_autodelete(message.chat.id)
     await message.reply_text(
         "🔴 **Auto Delete Disabled**\n\n"
-        "Messages will no longer be automatically deleted.\n\n"
-        "_Use /autodelete\\_on to re-enable with previous settings._"
+        "Messages will no longer be deleted.\n\n"
+        "_Use /autodelete\\_on to re-enable_"
     )
 
 
+# ── Time commands ──────────────────────────────────────────
+
 @admin_only
 async def cmd_autodelete_1day(client, message):
-    await _apply_and_reply(client, message, "messages", SECONDS_1DAY)
+    await _apply_and_reply(client, message, SECONDS_1DAY)
 
 @admin_only
 async def cmd_autodelete_1week(client, message):
-    await _apply_and_reply(client, message, "messages", SECONDS_1WEEK)
+    await _apply_and_reply(client, message, SECONDS_1WEEK)
 
 @admin_only
 async def cmd_autodelete_1month(client, message):
-    await _apply_and_reply(client, message, "messages", SECONDS_1MONTH)
+    await _apply_and_reply(client, message, SECONDS_1MONTH)
 
 
-@admin_only
-async def cmd_autodelete_media_1day(client, message):
-    await _apply_and_reply(client, message, "media", SECONDS_1DAY)
-
-@admin_only
-async def cmd_autodelete_media_1week(client, message):
-    await _apply_and_reply(client, message, "media", SECONDS_1WEEK)
-
-@admin_only
-async def cmd_autodelete_media_1month(client, message):
-    await _apply_and_reply(client, message, "media", SECONDS_1MONTH)
-
-
-@admin_only
-async def cmd_autodelete_all_1day(client, message):
-    await _apply_and_reply(client, message, "all", SECONDS_1DAY)
-
-@admin_only
-async def cmd_autodelete_all_1week(client, message):
-    await _apply_and_reply(client, message, "all", SECONDS_1WEEK)
-
-@admin_only
-async def cmd_autodelete_all_1month(client, message):
-    await _apply_and_reply(client, message, "all", SECONDS_1MONTH)
-
+# ── Custom time ────────────────────────────────────────────
 
 @admin_only
 async def cmd_autodelete_custom(client: Client, message: Message):
-    """Start custom-time flow: ask admin to type duration."""
     _awaiting_custom[message.chat.id] = message.from_user.id
     await message.reply_text(
-        "✏️ **Custom Auto Delete Time**\n\n"
-        "Send the duration in one of these formats:\n\n"
-        "• `10m`  → 10 minutes\n"
-        "• `12h`  → 12 hours\n"
-        "• `7d`   → 7 days\n"
-        "• `2w`   → 2 weeks\n"
-        "• `1mo`  → 1 month\n\n"
-        "_Reply with your custom time now:_"
+        "✏️ **Custom Delete Time**\n\n"
+        "Type the duration:\n\n"
+        "`10m` → 10 minutes\n"
+        "`12h` → 12 hours\n"
+        "`7d`  → 7 days\n"
+        "`2w`  → 2 weeks\n"
+        "`1mo` → 1 month\n\n"
+        "_Send your time now:_"
     )
 
 
 async def handle_custom_time_input(client: Client, message: Message):
-    """
-    Catches plain text reply when the chat is in custom-time-input mode.
-    Registered with a lower group number so it runs after command handlers.
-    """
     chat_id = message.chat.id
     if chat_id not in _awaiting_custom:
         return
@@ -256,30 +215,25 @@ async def handle_custom_time_input(client: Client, message: Message):
 
     del _awaiting_custom[chat_id]
     seconds = _parse_custom_time(message.text or "")
+
     if seconds is None or seconds < 60:
         await message.reply_text(
             "❌ **Invalid format.**\n\n"
-            "Please use: `10m`, `12h`, `7d`, `2w`, `1mo`\n"
-            "Minimum is 1 minute (`1m`).\n\n"
-            "_Run /autodelete\\_custom to try again._"
+            "Use: `10m` `12h` `7d` `2w` `1mo`\n"
+            "Min: 1 minute\n\n"
+            "_Run /autodelete\\_custom to try again_"
         )
         return
 
-    await _apply_and_reply(client, message, "all", seconds)
+    await _apply_and_reply(client, message, seconds)
 
 
-# ── Inline button callbacks ────────────────────────────────
+# ── Callback handler ───────────────────────────────────────
 
-CALLBACK_MAP = {
-    "ad:msg:1d":    ("messages", SECONDS_1DAY),
-    "ad:msg:1w":    ("messages", SECONDS_1WEEK),
-    "ad:msg:1mo":   ("messages", SECONDS_1MONTH),
-    "ad:media:1d":  ("media",    SECONDS_1DAY),
-    "ad:media:1w":  ("media",    SECONDS_1WEEK),
-    "ad:media:1mo": ("media",    SECONDS_1MONTH),
-    "ad:all:1d":    ("all",      SECONDS_1DAY),
-    "ad:all:1w":    ("all",      SECONDS_1WEEK),
-    "ad:all:1mo":   ("all",      SECONDS_1MONTH),
+CALLBACK_SECONDS = {
+    "ad:1d":  SECONDS_1DAY,
+    "ad:1w":  SECONDS_1WEEK,
+    "ad:1mo": SECONDS_1MONTH,
 }
 
 
@@ -287,47 +241,41 @@ async def callback_autodelete(client: Client, query: CallbackQuery):
     chat_id = query.message.chat.id
     user_id = query.from_user.id
 
-    # Admin check for callback too
     if not await _is_admin(client, chat_id, user_id):
-        await query.answer("🚫 Only admins can change this.", show_alert=True)
+        await query.answer("🚫 Admins only.", show_alert=True)
         return
 
     data = query.data
 
+    # ── Turn Off ──
     if data == "ad:off":
         await disable_autodelete(chat_id)
-        await query.answer("🔴 Auto Delete disabled.", show_alert=False)
+        await query.answer("🔴 Disabled", show_alert=False)
         await query.message.edit_text(
             "🔴 **Auto Delete Disabled**\n\n"
-            "Messages will no longer be automatically deleted.\n\n"
-            "_Use /autodelete\\_on to re-enable._"
+            "Messages will no longer be deleted.\n\n"
+            "_Use /autodelete\\_on to re-enable_"
         )
         return
 
+    # ── Custom ──
     if data == "ad:custom":
         _awaiting_custom[chat_id] = user_id
-        await query.answer("✏️ Send your custom time now.", show_alert=False)
+        await query.answer("✏️ Send duration now", show_alert=False)
         await query.message.reply_text(
-            "✏️ **Custom Auto Delete Time**\n\n"
-            "Send the duration:\n"
-            "• `10m` `12h` `7d` `2w` `1mo`"
+            "✏️ **Custom Delete Time**\n\n"
+            "Type: `10m` `12h` `7d` `2w` `1mo`"
         )
         return
 
-    if data in CALLBACK_MAP:
-        mode, seconds = CALLBACK_MAP[data]
-        await set_autodelete(chat_id, mode, seconds, enabled=True)
+    # ── Time preset ──
+    if data in CALLBACK_SECONDS:
+        seconds = CALLBACK_SECONDS[data]
+        await set_autodelete(chat_id, "all", seconds, enabled=True)
         duration = _format_duration(seconds)
-        mode_text = _mode_label(mode)
-
-        await query.answer(f"✅ {mode_text} — {duration}", show_alert=False)
+        await query.answer(f"✅ {duration}", show_alert=False)
         await query.message.edit_text(
-            f"✅ **Auto Delete Enabled**\n\n"
-            f"🗑️ **Scope :** {mode_text}\n"
-            f"⏳ **Delete after :** {duration}\n\n"
-            f"New {mode_text.lower()} will be automatically deleted "
-            f"after **{duration}**.\n\n"
-            f"_Use /autodelete\\_off to disable._",
+            _confirm_text(duration, seconds),
             reply_markup=_main_keyboard(),
         )
 
@@ -335,30 +283,18 @@ async def callback_autodelete(client: Client, query: CallbackQuery):
 # ── Registration ───────────────────────────────────────────
 
 def register_autodelete_system(app: Client):
+    app.on_message(filters.command("autodelete"))(cmd_autodelete)
     app.on_message(filters.command("autodelete_on"))(cmd_autodelete_on)
     app.on_message(filters.command("autodelete_off"))(cmd_autodelete_off)
-
     app.on_message(filters.command("autodelete_1day"))(cmd_autodelete_1day)
     app.on_message(filters.command("autodelete_1week"))(cmd_autodelete_1week)
     app.on_message(filters.command("autodelete_1month"))(cmd_autodelete_1month)
-
-    app.on_message(filters.command("autodelete_media_1day"))(cmd_autodelete_media_1day)
-    app.on_message(filters.command("autodelete_media_1week"))(cmd_autodelete_media_1week)
-    app.on_message(filters.command("autodelete_media_1month"))(cmd_autodelete_media_1month)
-
-    app.on_message(filters.command("autodelete_all_1day"))(cmd_autodelete_all_1day)
-    app.on_message(filters.command("autodelete_all_1week"))(cmd_autodelete_all_1week)
-    app.on_message(filters.command("autodelete_all_1month"))(cmd_autodelete_all_1month)
-
     app.on_message(filters.command("autodelete_custom"))(cmd_autodelete_custom)
 
-    # Custom time text input (group=5 runs after command handlers)
     app.on_message(
         filters.text & filters.group & ~filters.command(""),
         group=5,
     )(handle_custom_time_input)
 
-    # Inline button callbacks
     app.on_callback_query(filters.regex(r"^ad:"))(callback_autodelete)
-
     logger.info("✅ AutoDelete system registered.")
