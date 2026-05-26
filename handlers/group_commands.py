@@ -16,11 +16,27 @@ from pyrogram.enums import ChatMemberStatus
 import logging
 import re
 import db
+from plugin.group_guard.group_guard import group_is_approved
 
 DEFAULT_WELCOME = "👋 Welcome {mention} to {title}!"
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+
+async def _check_approved(message) -> bool:
+    """Returns True if approved. Sends rejection notice and returns False otherwise."""
+    if await group_is_approved(message.chat.id):
+        return True
+    status = await db.get_group_approval(message.chat.id)
+    if status == "rejected":
+        await message.reply_text("🚫 This group has been **rejected** and cannot use bot features.")
+    else:
+        await message.reply_text(
+            "⏳ This group is **pending approval**.\n"
+            "Commands are disabled until the bot owner approves this group."
+        )
+    return False
 
 
 async def is_power(client, chat_id: int, user_id: int) -> bool:
@@ -187,6 +203,8 @@ def register_group_commands(app: Client):
 
     @app.on_message(filters.group & filters.new_chat_members)
     async def new_member_message(client: Client, message: Message):
+        if not await group_is_approved(message.chat.id):
+            return  # silently skip unapproved groups
         await handle_welcome(
             client,
             message.chat.id,
@@ -196,6 +214,8 @@ def register_group_commands(app: Client):
 
     @app.on_message(filters.group & filters.command("welcome"))
     async def welcome_toggle(client, message: Message):
+        if not await _check_approved(message):
+            return
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
 
@@ -209,6 +229,8 @@ def register_group_commands(app: Client):
 
     @app.on_message(filters.group & filters.command("setwelcome"))
     async def set_welcome(client, message: Message):
+        if not await _check_approved(message):
+            return
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
 
@@ -225,6 +247,8 @@ def register_group_commands(app: Client):
 
     @app.on_message(filters.group & filters.command("setwelcomebutton"))
     async def set_welcome_button(client, message: Message):
+        if not await _check_approved(message):
+            return
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
 
@@ -269,6 +293,8 @@ def register_group_commands(app: Client):
 
     @app.on_message(filters.group & filters.command("clearwelcomebutton"))
     async def clear_welcome_button(client, message: Message):
+        if not await _check_approved(message):
+            return
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
 
@@ -277,6 +303,8 @@ def register_group_commands(app: Client):
 
     @app.on_message(filters.group & filters.command("welcomebuttons"))
     async def show_welcome_buttons(client, message: Message):
+        if not await _check_approved(message):
+            return
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
 
@@ -300,6 +328,8 @@ def register_group_commands(app: Client):
     # /kick
     @app.on_message(filters.group & filters.command("kick"))
     async def kick_user(client, message):
+        if not await _check_approved(message):
+            return
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
         user = await extract_target_user(client, message)
@@ -320,6 +350,8 @@ def register_group_commands(app: Client):
     # /ban
     @app.on_message(filters.group & filters.command("ban"))
     async def ban_user(client, message):
+        if not await _check_approved(message):
+            return
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
         user = await extract_target_user(client, message)
@@ -339,6 +371,8 @@ def register_group_commands(app: Client):
     # /unban
     @app.on_message(filters.group & filters.command("unban"))
     async def unban_user(client, message):
+        if not await _check_approved(message):
+            return
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
         user = await extract_target_user(client, message)
@@ -353,6 +387,8 @@ def register_group_commands(app: Client):
     # /mute
     @app.on_message(filters.group & filters.command("mute"))
     async def mute_user(client, message):
+        if not await _check_approved(message):
+            return
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
         user = await extract_target_user(client, message)
@@ -372,6 +408,8 @@ def register_group_commands(app: Client):
     # /unmute
     @app.on_message(filters.group & filters.command("unmute"))
     async def unmute_user(client, message):
+        if not await _check_approved(message):
+            return
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
         user = await extract_target_user(client, message)
@@ -388,6 +426,8 @@ def register_group_commands(app: Client):
     # /warn
     @app.on_message(filters.group & filters.command("warn"))
     async def warn_user(client, message):
+        if not await _check_approved(message):
+            return
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
         user = await extract_target_user(client, message)
@@ -408,6 +448,8 @@ def register_group_commands(app: Client):
     # /warns
     @app.on_message(filters.group & filters.command("warns"))
     async def warns_user(client, message):
+        if not await _check_approved(message):
+            return
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
         user = await extract_target_user(client, message)
@@ -419,6 +461,8 @@ def register_group_commands(app: Client):
     # /resetwarns
     @app.on_message(filters.group & filters.command("resetwarns"))
     async def resetwarns_user(client, message):
+        if not await _check_approved(message):
+            return
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
         user = await extract_target_user(client, message)
@@ -430,6 +474,8 @@ def register_group_commands(app: Client):
     # /promote
     @app.on_message(filters.group & filters.command("promote"))
     async def promote_user(client: Client, message: Message):
+        if not await _check_approved(message):
+            return
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
         user = await extract_target_user(client, message)
@@ -452,6 +498,8 @@ def register_group_commands(app: Client):
     # /demote
     @app.on_message(filters.group & filters.command("demote"))
     async def demote_user(client: Client, message: Message):
+        if not await _check_approved(message):
+            return
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
         user = await extract_target_user(client, message)
