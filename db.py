@@ -43,6 +43,28 @@ async def get_welcome_status(chat_id) -> bool:
     data = await db.welcome.find_one({"chat_id": chat_id})
     return bool(data.get("enabled", True)) if data else True
 
+# ==========================================================
+# 🔘 Welcome Buttons
+# ==========================================================
+
+async def set_welcome_buttons(chat_id: int, buttons: list):
+    await db.welcome.update_one(
+        {"chat_id": chat_id},
+        {"$set": {"buttons": buttons}},
+        upsert=True
+    )
+
+async def get_welcome_buttons(chat_id: int):
+    data = await db.welcome.find_one({"chat_id": chat_id})
+    return data.get("buttons", []) if data else []
+
+async def clear_welcome_buttons(chat_id: int):
+    await db.welcome.update_one(
+        {"chat_id": chat_id},
+        {"$unset": {"buttons": ""}},
+        upsert=True
+    )
+
 
 # ==========================================================
 # 🔒 Lock
