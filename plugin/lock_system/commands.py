@@ -9,7 +9,7 @@ async def is_admin(client, chat_id, user_id):
     return member.status in ("administrator", "owner")
 
 
-def register_handlers(app):
+def register_lock_system(app):
 
     @app.on_message(filters.command("lock") & filters.group)
     async def lock_cmd(client, message):
@@ -33,8 +33,6 @@ def register_handlers(app):
                     can_add_web_page_previews=False,
                     can_send_polls=False,
                     can_invite_users=True,
-                    can_pin_messages=False,
-                    can_change_info=False,
                 ),
             )
             return await message.reply_text("Locked all.")
@@ -68,8 +66,6 @@ def register_handlers(app):
                     can_add_web_page_previews=True,
                     can_send_polls=True,
                     can_invite_users=True,
-                    can_pin_messages=False,
-                    can_change_info=False,
                 ),
             )
             return await message.reply_text("Unlocked all.")
