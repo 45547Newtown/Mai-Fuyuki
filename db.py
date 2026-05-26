@@ -114,24 +114,3 @@ async def get_all_users():
         if "user_id" in document:
             users.append(document["user_id"])
     return users
-
-# ==========================================================
-# 🛡️ Group Guard — Approval Status
-# ==========================================================
-
-async def set_group_status(chat_id: int, status: str):
-    """Status: 'pending' | 'approved' | 'rejected'"""
-    await db.groups.update_one(
-        {"chat_id": chat_id},
-        {"$set": {"status": status}},
-        upsert=True
-    )
-
-async def get_group_status(chat_id: int) -> str:
-    """Returns 'approved', 'pending', 'rejected', ya 'unknown'"""
-    data = await db.groups.find_one({"chat_id": chat_id})
-    return data.get("status", "unknown") if data else "unknown"
-
-async def is_group_approved(chat_id: int) -> bool:
-    return await get_group_status(chat_id) == "approved"
-    
