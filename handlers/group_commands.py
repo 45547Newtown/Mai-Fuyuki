@@ -20,10 +20,21 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+# ==========================================================
+# Global helpers
+# ==========================================================
 
-# ==========================================================
-# Global helper
-# ==========================================================
+async def is_approved(chat_id: int) -> bool:
+    """Check karo ke group approved hai ya nahi."""
+    return await db.is_group_approved(chat_id)
+
+
+PENDING_MSG = (
+    "⏳ <b>Approval Pending</b>\n\n"
+    "Yeh bot abhi is group mein approve nahi hua.\n"
+    "Admin se request hai ke log channel se ✅ Confirm karein."
+)
+
 
 async def is_power(client, chat_id: int, user_id: int) -> bool:
     member = await client.get_chat_member(chat_id, user_id)
@@ -106,6 +117,8 @@ def register_group_commands(app: Client):
     
     @app.on_message(filters.group & filters.command("welcome"))
     async def welcome_toggle(client, message: Message):
+        if not await is_approved(message.chat.id):
+            return await message.reply_text(PENDING_MSG, parse_mode="html")
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin or owner can use this command.")
     
@@ -127,6 +140,8 @@ def register_group_commands(app: Client):
     
     @app.on_message(filters.group & filters.command("setwelcome"))
     async def set_welcome(client, message: Message):
+        if not await is_approved(message.chat.id):
+            return await message.reply_text(PENDING_MSG, parse_mode="html")
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("⚠️ Only admin can use this command.")
     
@@ -143,6 +158,8 @@ def register_group_commands(app: Client):
     # ==========================================================
     @app.on_message(filters.group & filters.command("kick"))
     async def kick_user(client, message):
+        if not await is_approved(message.chat.id):
+            return await message.reply_text(PENDING_MSG, parse_mode="html")
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
     
@@ -169,6 +186,8 @@ def register_group_commands(app: Client):
     # ==========================================================
     @app.on_message(filters.group & filters.command("ban"))
     async def ban_user(client, message):
+        if not await is_approved(message.chat.id):
+            return await message.reply_text(PENDING_MSG, parse_mode="html")
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
     
@@ -194,6 +213,8 @@ def register_group_commands(app: Client):
     # ==========================================================
     @app.on_message(filters.group & filters.command("unban"))
     async def unban_user(client, message):
+        if not await is_approved(message.chat.id):
+            return await message.reply_text(PENDING_MSG, parse_mode="html")
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
     
@@ -219,6 +240,8 @@ def register_group_commands(app: Client):
     # ==========================================================
     @app.on_message(filters.group & filters.command("mute"))
     async def mute_user(client, message):
+        if not await is_approved(message.chat.id):
+            return await message.reply_text(PENDING_MSG, parse_mode="html")
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
     
@@ -248,6 +271,8 @@ def register_group_commands(app: Client):
     # ==========================================================
     @app.on_message(filters.group & filters.command("unmute"))
     async def unmute_user(client, message):
+        if not await is_approved(message.chat.id):
+            return await message.reply_text(PENDING_MSG, parse_mode="html")
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
     
@@ -282,6 +307,8 @@ def register_group_commands(app: Client):
     # ==========================================================
     @app.on_message(filters.group & filters.command("warn"))
     async def warn_user(client, message):
+        if not await is_approved(message.chat.id):
+            return await message.reply_text(PENDING_MSG, parse_mode="html")
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
     
@@ -312,6 +339,8 @@ def register_group_commands(app: Client):
     # ==========================================================
     @app.on_message(filters.group & filters.command("warns"))
     async def warns_user(client, message):
+        if not await is_approved(message.chat.id):
+            return await message.reply_text(PENDING_MSG, parse_mode="html")
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
     
@@ -332,6 +361,8 @@ def register_group_commands(app: Client):
     # ==========================================================
     @app.on_message(filters.group & filters.command("resetwarns"))
     async def resetwarns_user(client, message):
+        if not await is_approved(message.chat.id):
+            return await message.reply_text(PENDING_MSG, parse_mode="html")
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
     
@@ -353,6 +384,8 @@ def register_group_commands(app: Client):
     # ==========================================================
     @app.on_message(filters.group & filters.command("promote"))
     async def promote_user(client: Client, message: Message):
+        if not await is_approved(message.chat.id):
+            return await message.reply_text(PENDING_MSG, parse_mode="html")
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin or owner can use this command.")
     
@@ -404,6 +437,8 @@ def register_group_commands(app: Client):
     # ==========================================================
     @app.on_message(filters.group & filters.command("demote"))
     async def demote_user(client: Client, message: Message):
+        if not await is_approved(message.chat.id):
+            return await message.reply_text(PENDING_MSG, parse_mode="html")
         if not await is_power(client, message.chat.id, message.from_user.id):
             return await message.reply_text("❌ Only admin can use this command.")
     
