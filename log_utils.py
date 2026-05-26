@@ -76,24 +76,27 @@ async def send_startup_log(client: Client) -> None:
         pyrogram_version = __import__("pyrogram").__version__
 
         # ── Small caps startup message ───────────────────────
+        started_date = datetime.utcnow().strftime("%Y-%m-%d")
+
         caption = (
-            "╔════════════════════╗\n"
-            "ʜɪᴍᴀᴡᴀʀɪ ʜᴇʟᴘ ʙᴏᴛ\n"
-            "╚════════════════════╝\n\n"
-            f"⌬ ꜱᴛᴀᴛᴜꜱ      : ᴏɴʟɪɴᴇ\n"
-            f"⌬ ʙᴏᴛ         : {bot_name}\n"
-            f"⌬ ᴜꜱᴇʀɴᴀᴍᴇ    : {bot_username}\n\n"
             "━━━━━━━━━━━━━━━━━━\n\n"
-            f"⌬ ᴘʏᴛʜᴏɴ      : v{platform.python_version()}\n"
-            f"⌬ ᴘʏʀᴏɢʀᴀᴍ    : v{pyrogram_version}\n"
-            f"⌬ ᴏꜱ          : {platform.system()} {platform.release()}\n\n"
+            "ʜɪᴍᴀᴡᴀʀɪ ʜᴇʟᴘ ʙᴏᴛ\n\n"
             "━━━━━━━━━━━━━━━━━━\n\n"
-            "⌬ ᴜᴘᴛɪᴍᴇ      : ᴀᴄᴛɪᴠᴇ\n"
-            "⌬ ᴍᴏᴅᴇ        : ʜɪᴍᴀᴡᴀʀɪ ᴘᴏᴡᴇʀ\n\n"
+            f"ꜱᴛᴀᴛᴜꜱ      : ᴏɴʟɪɴᴇ\n"
+            f"ʙᴏᴛ         : {bot_name}\n"
+            f"ᴜꜱᴇʀɴᴀᴍᴇ    : {bot_username}\n\n"
             "━━━━━━━━━━━━━━━━━━\n\n"
-            "ʜɪᴍᴀᴡᴀʀɪ ꜱʏꜱᴛᴇᴍ\n"
-            "ꜱᴜᴄᴄᴇꜱꜱꜰᴜʟʟʏ ᴀᴄᴛɪᴠᴀᴛᴇᴅ\n\n"
-            "╚════════════════════╝"
+            f"ᴘʏᴛʜᴏɴ      : v{platform.python_version()}\n"
+            f"ᴘʏʀᴏɢʀᴀᴍ    : v{pyrogram_version}\n"
+            f"ᴏꜱ          : {platform.system()} {platform.release()}\n\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            f"ꜱᴛᴀʀᴛᴇᴅ     : {started_date}\n"
+            "ᴄᴏʀᴇ        : ᴀᴄᴛɪᴠᴇ\n"
+            "ꜱᴛᴀᴛᴇ       : ꜱᴛᴀʙʟᴇ\n\n"
+            "━━━━━━━━━━━━━━━━━━\n\n"
+            "ʜɪᴍᴀᴡᴀʀɪ ᴘᴏᴡᴇʀ\n"
+            "ᴀᴄᴛɪᴠᴀᴛᴇᴅ\n\n"
+            "━━━━━━━━━━━━━━━━━━"
         )
 
         # Send as plain text — no image
