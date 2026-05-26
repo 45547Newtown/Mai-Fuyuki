@@ -7,3 +7,4 @@ def register_all_lock_plugins(app):
     register_lock_system(app)
     register_lock_url(app)
     register_lock_sticker(app)
+    
