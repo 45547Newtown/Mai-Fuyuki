@@ -36,3 +36,9 @@ def _parse_chat_id(value: str):
 
 LOG_CHAT_ID = _parse_chat_id(os.getenv("LOG_CHAT_ID", ""))
 SUDO_USERS = [int(x) for x in os.getenv("SUDO_USERS", str(OWNER_ID)).replace(" ", "").split(",") if x]
+
+# ── Force Subscribe ───────────────────────────────────────────
+# FORCE_SUB_CHANNEL : @username  OR  -100xxxxxxxxxx  of the channel
+# FORCE_SUB_URL     : Full t.me link shown on the "Join Channel" button
+FORCE_SUB_CHANNEL = os.getenv("FORCE_SUB_CHANNEL", "").strip()
+FORCE_SUB_URL = os.getenv("FORCE_SUB_URL", "").strip()
